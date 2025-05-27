@@ -45,7 +45,11 @@ class ApiRegistrationTest extends TestCase
             ])
             ->assertJsonFragment([
                 'user' => [
+                    'nom' => 'Test',
+                    'prenom' => 'Patient',
                     'email' => 'patient@example.com',
+                    'status' => 'actif',
+                    'email_verified_at' => null,
                     'role' => 'patient',
                 ]
             ]);
@@ -109,7 +113,6 @@ class ApiRegistrationTest extends TestCase
             'password' => 'password123',
             'password_confirmation' => 'password123',
             'role' => 'medecin',
-            // Missing speciality_id
         ];
 
         $response = $this->postJson('/api/register', $doctorData); // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/routes/api.php]

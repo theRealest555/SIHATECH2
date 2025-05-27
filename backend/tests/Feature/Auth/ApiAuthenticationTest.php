@@ -38,6 +38,10 @@ class ApiAuthenticationTest extends TestCase
                 'user' => [
                     'email' => $user->email,
                     'role' => 'patient',
+                    'status' => 'actif',
+                    'email_verified_at' => $user->email_verified_at->toISOString(),
+                    'nom' => $user->nom,
+                    'prenom' => $user->prenom,
                 ],
                 'role' => 'patient',
             ]);
@@ -113,7 +117,7 @@ class ApiAuthenticationTest extends TestCase
             'status' => 'actif',
         ]);
         // Ensure the Admin model record exists if your AdminAuthController checks it
-        \App\Models\Admin::factory()->create(['user_id' => $adminUser->id, 'admin_status' => 1]);
+        // \App\Models\Admin::factory()->create(['user_id' => $adminUser->id, 'admin_status' => 1]);
 
 
         $response = $this->postJson('/api/admin/login', [ // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/routes/api.php]
@@ -151,7 +155,7 @@ class ApiAuthenticationTest extends TestCase
     public function test_admin_can_logout_via_admin_route(): void
     {
         $adminUser = User::factory()->create(['role' => 'admin']);
-        \App\Models\Admin::factory()->create(['user_id' => $adminUser->id]);
+        // \App\Models\Admin::factory()->create(['user_id' => $adminUser->id]);
         Sanctum::actingAs($adminUser, ['role:admin']);
 
         $response = $this->postJson('/api/admin/logout'); // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/routes/api.php]

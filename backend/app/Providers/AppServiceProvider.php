@@ -5,6 +5,9 @@ namespace App\Providers;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request;
+use Illuminate\Cache\RateLimiting\Limit;
 use App\Models\Avis;
 use App\Observers\ReviewObserver;
 
@@ -26,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureRateLimiting();
         // Configure password reset URL
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
             return config('app.frontend_url')."/password-reset/$token?email={$notifiable->getEmailForPasswordReset()}";
@@ -94,4 +98,14 @@ class AppServiceProvider extends ServiceProvider
             return isset($horaires[$frenchDay]) && !empty($horaires[$frenchDay]);
         }, 'The doctor is not available on the selected day.');
     }
+
+    /**
+     * Configure the rate limiting for the application.
+     */
+    protected function configureRateLimiting()
+{
+    RateLimiter::for('api', function (Request $request) {
+        return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+    });
+}
 }
