@@ -7,41 +7,9 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
-function renderAuthException(\Illuminate\Auth\AuthenticationException $e, Request $request) {
-    if ($request->expectsJson() || $request->is('api/*')) {
-        return response()->json([
-            'message' => 'Unauthenticated. Please login.',
-        ], 401);
-    }
-    return response()->json(['message' => 'Unauthenticated'], 401);
-}
-
-function renderValidationException(\Illuminate\Validation\ValidationException $e, Request $request) {
-    if ($request->expectsJson() || $request->is('api/*')) {
-        return response()->json([
-            'message' => 'Validation failed',
-            'errors' => $e->errors(),
-        ], 422);
-    }
-    throw $e;
-}
-
-function renderGeneralException(\Throwable $e, Request $request) {
-    if ($request->expectsJson() || $request->is('api/*')) {
-        $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
-        return response()->json([
-            'message' => $e->getMessage() ?: 'Server Error',
-            'error' => config('app.debug') ? [
-                'exception' => get_class($e),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTrace()
-            ] : null
-        ], $status);
-    }
-    throw $e;
-}
-
+// Remove the globally defined functions:
+// renderAuthException, renderValidationException, renderGeneralException
+// as their logic is now handled within ->withExceptions()
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -68,12 +36,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'precognitive' => \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
             'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
+            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/EnsureEmailIsVerified.php]
 
             // Custom middleware
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
-            'verified.doctor' => \App\Http\Middleware\VerifiedDoctor::class,
-            'active.user' => \App\Http\Middleware\ActiveUser::class,
+            'role' => \App\Http\Middleware\RoleMiddleware::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/RoleMiddleware.php]
+            'verified.doctor' => \App\Http\Middleware\VerifiedDoctor::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/VerifiedDoctor.php]
+            'active.user' => \App\Http\Middleware\ActiveUser::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/ActiveUser.php]
         ]);
 
         // Enable rate limiting for all API routes
@@ -87,8 +55,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Unauthenticated. Please login.',
                 ], 401);
             }
-            // Fallback for non-API requests (though we shouldn't have any)
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            // Fallback for non-API requests (though we shouldn't have any for an API-centric app)
+            // If you have web routes that might trigger this, you might redirect to a login page.
+            // For a pure API, returning JSON is appropriate.
+            return response()->json(['message' => 'Unauthenticated (Non-API context)'], 401);
         });
 
         // Handle validation exceptions
@@ -99,6 +69,8 @@ return Application::configure(basePath: dirname(__DIR__))
                     'errors' => $e->errors(),
                 ], 422);
             }
+            // For non-API requests, re-throw to let Laravel handle it (e.g., redirect back with errors)
+            // For a pure API, this part might not be hit if all requests are API requests.
             throw $e;
         });
 
@@ -106,16 +78,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Throwable $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
                 $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
-                return response()->json([
+                $response = [
                     'message' => $e->getMessage() ?: 'Server Error',
-                    'error' => config('app.debug') ? [
+                ];
+                if (config('app.debug')) {
+                    $response['error'] = [
                         'exception' => get_class($e),
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
-                        'trace' => $e->getTrace()
-                    ] : null
-                ], $status);
+                        'trace' => $e->getTrace() // Consider limiting trace in production even if debug is on for API
+                    ];
+                }
+                return response()->json($response, $status);
             }
+            // For non-API requests, re-throw to let Laravel handle it (e.g., show error page)
             throw $e;
         });
     })->create();
