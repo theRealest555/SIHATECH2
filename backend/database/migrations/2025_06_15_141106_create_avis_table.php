@@ -11,7 +11,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('patient_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('doctor_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('appointment_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('rendezvous_id')->nullable()->constrained('rendezvous')->onDelete('set null');
             $table->integer('rating')->check('rating >= 1 AND rating <= 5');
             $table->text('comment')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
