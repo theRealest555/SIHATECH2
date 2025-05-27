@@ -2,13 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Models\UserSubscription; // Changed from Abonnement to UserSubscription
+use App\Models\UserSubscription;
 use App\Models\Doctor;
-use App\Models\Abonnement; // Import Abonnement for plan_id
-use App\Models\User; // Import User for user_id
+use App\Models\Abonnement;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB; // Import DB Facade
 
 class AbonnementsTableSeeder extends Seeder
 {
@@ -18,41 +18,43 @@ class AbonnementsTableSeeder extends Seeder
         if (User::count() === 0 || Doctor::count() === 0 || Abonnement::count() === 0) {
             $this->call([
                 UserTableSeeder::class,
-                SpecialitiesTableSeeder::class, // Assuming doctors depend on specialities
+                SpecialitiesTableSeeder::class,
                 DoctorsTableSeeder::class,
-                SubscriptionPlansSeeder::class // Ensure subscription plans exist
+                SubscriptionPlansSeeder::class
             ]);
         }
 
         $patients = User::where('role', 'patient')->get();
-        $doctors = Doctor::all(); // Doctors have user_id
-        $abonnementsPlans = Abonnement::all(); // Actual subscription plans
+        $doctors = Doctor::all();
+        $abonnementsPlans = Abonnement::all();
 
         if ($patients->isEmpty() || $abonnementsPlans->isEmpty()) {
             $this->command->error('Please ensure UserTableSeeder, DoctorsTableSeeder, and SubscriptionPlansSeeder have been run!');
             return;
         }
 
-        // Clear existing user subscriptions to avoid duplicates on re-seeding
-        // Consider if you want to truncate or update based on specific unique keys
+        // Temporarily disable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;'); // Add this line
+
+        // Clear existing user subscriptions
         DB::table('user_subscriptions')->truncate();
 
-        // Seed UserSubscription data based on existing users and abonnement plans
-        // This seeder was originally trying to seed the `abonnements` table with user subscription data.
-        // It should instead seed the `user_subscriptions` table.
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;'); // Add this line
+
 
         // Example data for UserSubscription
         $userSubscriptionsData = [
             [
-                'user_id' => $patients->first()->id, // Assuming the first patient has a subscription
-                'subscription_plan_name' => 'Basic', // Use plan name to find the plan
+                'user_id' => $patients->first()->id,
+                'subscription_plan_name' => 'Basic',
                 'starts_at' => Carbon::now()->subMonths(2),
                 'ends_at' => Carbon::now()->subDays(1),
                 'status' => 'expired',
                 'cancelled_at' => null,
             ],
             [
-                'user_id' => $patients->first()->id, // Same patient, new subscription
+                'user_id' => $patients->first()->id,
                 'subscription_plan_name' => 'Premium',
                 'starts_at' => Carbon::now()->subDays(5),
                 'ends_at' => Carbon::now()->addMonths(1)->subDays(5),
@@ -60,7 +62,7 @@ class AbonnementsTableSeeder extends Seeder
                 'cancelled_at' => null,
             ],
             [
-                'user_id' => $doctors->first()->user_id, // Assuming the first doctor has a subscription
+                'user_id' => $doctors->first()->user_id,
                 'subscription_plan_name' => 'Premium Annuel',
                 'starts_at' => Carbon::now()->subMonths(3),
                 'ends_at' => Carbon::now()->addMonths(9),
@@ -68,7 +70,7 @@ class AbonnementsTableSeeder extends Seeder
                 'cancelled_at' => null,
             ],
              [
-                'user_id' => $doctors->get(1)->user_id ?? $doctors->first()->user_id, // Second doctor
+                'user_id' => $doctors->get(1)->user_id ?? $doctors->first()->user_id,
                 'subscription_plan_name' => 'Basic',
                 'starts_at' => Carbon::now()->subWeek(),
                 'ends_at' => Carbon::now()->addMonths(1)->subWeek(),
@@ -89,7 +91,7 @@ class AbonnementsTableSeeder extends Seeder
                     'starts_at' => $subscriptionData['starts_at'],
                     'ends_at' => $subscriptionData['ends_at'],
                     'cancelled_at' => $subscriptionData['cancelled_at'],
-                    'payment_method' => ['type' => 'manual', 'details' => 'seeded data'] // Add dummy payment method
+                    'payment_method' => ['type' => 'manual', 'details' => 'seeded data']
                 ]);
             } else {
                 $this->command->warn("Skipping subscription for user ID {$subscriptionData['user_id']} with plan '{$subscriptionData['subscription_plan_name']}' because plan or user not found.");
