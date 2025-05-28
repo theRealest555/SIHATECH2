@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB; // Import DB Facade
 
 class ReportController extends Controller
 {
@@ -75,12 +76,14 @@ class ReportController extends Controller
             $export = new FinancialReportExport($data);
 
             $headers = [
-                'Content-Type' => 'text/csv',
+                'Content-Type' => 'text/csv; charset=UTF-8',
                 'Content-Disposition' => 'attachment; filename="rapport_financier_' . now()->format('Y-m-d') . '.csv"'
             ];
 
             $callback = function() use ($export) {
                 $file = fopen('php://output', 'w');
+                // Add UTF-8 BOM for better Excel compatibility with special characters
+                fputs($file, "\xEF\xBB\xBF");
 
                 // Add headers
                 fputcsv($file, $export->headings());
@@ -96,11 +99,11 @@ class ReportController extends Controller
             return Response::stream($callback, 200, $headers);
         }
 
-        // For PDF format, return JSON response
+        // For any other format, return 501 Not Implemented
         return response()->json([
-            'message' => 'PDF export functionality requires additional setup',
-            'data' => $data
-        ]);
+            'message' => 'The requested export format is not supported. Please use CSV.',
+            'requested_format' => $format
+        ], 501);
     }
 
     private function calculateCompletionRate($startDate, $endDate): float
@@ -127,8 +130,13 @@ class ReportController extends Controller
 
     private function getPeakHours($startDate, $endDate)
     {
+        // Use database-agnostic way to extract hour
+        $hourExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%H', date_heure)"
+            : "HOUR(date_heure)";
+
         return Rendezvous::whereBetween('created_at', [$startDate, $endDate])
-            ->selectRaw('HOUR(date_heure) as hour, count(*) as count')
+            ->selectRaw("{$hourExpression} as hour, count(*) as count")
             ->groupBy('hour')
             ->orderByDesc('count')
             ->limit(10)

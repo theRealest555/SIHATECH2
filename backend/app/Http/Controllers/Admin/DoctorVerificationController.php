@@ -74,7 +74,7 @@ class DoctorVerificationController extends Controller
         AuditLog::create([
             'user_id' => $admin->id,
             'action' => 'approved_document',
-            'target_type' => 'document',
+            'target_type' => Document::class, // Use class constant for morphable type
             'target_id' => $document->id,
         ]);
 
@@ -104,8 +104,9 @@ class DoctorVerificationController extends Controller
         AuditLog::create([
             'user_id' => $admin->id,
             'action' => 'rejected_document',
-            'target_type' => 'document',
+            'target_type' => Document::class, // Use class constant
             'target_id' => $document->id,
+            'metadata' => json_encode(['reason' => $validated['rejection_reason']]) // Ensure metadata is saved
         ]);
 
         return response()->json([
@@ -141,7 +142,7 @@ class DoctorVerificationController extends Controller
         AuditLog::create([
             'user_id' => $admin->id,
             'action' => 'verified_doctor',
-            'target_type' => 'doctor',
+            'target_type' => Doctor::class, // Use class constant
             'target_id' => $doctor->id,
         ]);
 
@@ -157,7 +158,6 @@ class DoctorVerificationController extends Controller
     public function revokeVerification(RevokeVerificationRequest $request, int $id): JsonResponse
     {
         $validated = $request->validated();
-
         $admin = $request->user();
         $doctor = Doctor::findOrFail($id);
 
@@ -169,9 +169,9 @@ class DoctorVerificationController extends Controller
         AuditLog::create([
             'user_id' => $admin->id,
             'action' => 'revoked_doctor_verification',
-            'target_type' => 'doctor',
+            'target_type' => Doctor::class, // Use class constant
             'target_id' => $doctor->id,
-            'metadata' => json_encode(['reason' => $validated['reason']])
+            'metadata' => json_encode(['reason' => $validated['reason']]) // Ensure metadata is saved
         ]);
 
         return response()->json([

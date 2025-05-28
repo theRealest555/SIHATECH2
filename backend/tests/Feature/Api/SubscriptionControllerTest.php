@@ -4,32 +4,33 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User; //
-use App\Models\Abonnement; //
-use App\Models\UserSubscription; //
-use App\Services\StripePaymentService; //
+use App\Models\User;
+use App\Models\Abonnement;
+use App\Models\UserSubscription;
+use App\Services\StripePaymentService;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
-use Stripe\SetupIntent; //
-use Stripe\Customer; //
-use Stripe\Subscription as StripeSubscription; //
+// It's generally better to mock your service rather than Stripe SDK statics directly
+// use Stripe\SetupIntent;
+// use Stripe\Customer;
+// use Stripe\Subscription as StripeSubscription;
 
 
 class SubscriptionControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $user; //
-    protected Abonnement $plan; //
+    protected User $user;
+    protected Abonnement $plan;
     protected Mockery\MockInterface $stripeServiceMock;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create(['email_verified_at' => now(), 'status' => 'actif']); //
+        $this->user = User::factory()->create(['email_verified_at' => now(), 'status' => 'actif']);
         Sanctum::actingAs($this->user);
 
-        $this->plan = Abonnement::factory()->create([ //
+        $this->plan = Abonnement::factory()->create([
             'name' => 'Premium',
             'price' => 99.99,
             'billing_cycle' => 'monthly',
@@ -37,7 +38,7 @@ class SubscriptionControllerTest extends TestCase
         ]);
 
         // Mock Stripe service
-        $this->stripeServiceMock = Mockery::mock(StripePaymentService::class); //
+        $this->stripeServiceMock = Mockery::mock(StripePaymentService::class);
         $this->app->instance(StripePaymentService::class, $this->stripeServiceMock);
     }
 
@@ -49,43 +50,38 @@ class SubscriptionControllerTest extends TestCase
 
     public function test_can_get_subscription_plans()
     {
-        $response = $this->getJson('/api/subscriptions/plans'); //
+        $response = $this->getJson('/api/subscriptions/plans');
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
-            ->assertJsonCount(Abonnement::where('is_active', true)->count(), 'data') //
+            ->assertJsonCount(Abonnement::where('is_active', true)->count(), 'data')
             ->assertJsonFragment(['name' => 'Premium']);
     }
 
     public function test_can_get_stripe_setup_intent()
     {
-        $mockCustomer = Mockery::mock(Customer::class); //
-        $mockCustomer->id = 'cus_123';
-        $this->stripeServiceMock->shouldReceive('getOrCreateCustomer')->andReturn($mockCustomer);
+        // Mock the service method that encapsulates Stripe SDK calls
+        $this->stripeServiceMock
+            ->shouldReceive('getOrCreateCustomer')
+            ->with($this->user) // Ensure the correct user is passed
+            ->andReturn((object)['id' => 'cus_123']); // Return a simple object or array
 
-        $mockSetupIntent = Mockery::mock(SetupIntent::class); //
-        $mockSetupIntent->client_secret = 'seti_123_secret_456';
-        // Use a static method mock for Stripe SDK's create
-        Mockery::getConfiguration()->allowMockingNonExistentMethods(true);
-        Mockery::getConfiguration()->allowMockingMethodsUnnecessarily(true);
+        // Assume SubscriptionController calls a method in StripePaymentService to create setup intent
+        // This makes the controller easier to test.
+        // If SubscriptionController calls Stripe\SetupIntent::create directly, this test would be more complex.
+        // Let's assume a method like createStripeSetupIntent exists in your service.
+        $this->stripeServiceMock
+            ->shouldReceive('createStripeSetupIntent') // This method needs to exist in StripePaymentService
+            ->with('cus_123') // Customer ID
+            ->andReturn((object)['client_secret' => 'seti_123_secret_456']);
 
-        // Mock the static create method if Stripe SDK is directly used in controller
-        // This example assumes Stripe SDK is abstracted by StripePaymentService.
-        // If your controller directly calls Stripe\SetupIntent::create, you need to mock that.
-        // For simplicity, we assume the service handles it.
-        // If Stripe\SetupIntent::create is called directly in controller, this needs adjustment.
-        // For now, we're testing as if the service method handles it.
 
-        $response = $this->getJson('/api/subscriptions/setup-intent'); //
+        $response = $this->getJson('/api/subscriptions/setup-intent');
 
-        // This assertion depends on how SetupIntent::create is handled.
-        // If the service does it, the current mocking is fine.
-        // If the controller calls Stripe::create directly, you need a more complex mock.
-        // For the current setup, we'll assume the controller method works if the service is mocked.
-        // A more robust test would involve mocking the Stripe SDK's static methods.
-        // This is a known challenge in testing static SDK calls.
-        $response->assertStatus(200); // Simplified assertion due to static call complexity
-                                    // In a real scenario, you'd verify the client_secret based on SDK interaction.
+        $response->assertStatus(200)
+                 ->assertJsonPath('status', 'success')
+                 ->assertJsonPath('client_secret', 'seti_123_secret_456')
+                 ->assertJsonPath('customer_id', 'cus_123');
     }
 
 
@@ -93,24 +89,23 @@ class SubscriptionControllerTest extends TestCase
     {
         $paymentMethodId = 'pm_card_visa';
 
-        $mockStripeSubscription = Mockery::mock(StripeSubscription::class); //
-        $mockStripeSubscription->id = 'sub_123';
-
+        // Mock the service's processPayment method
         $this->stripeServiceMock
             ->shouldReceive('processPayment')
             ->once()
             ->with(Mockery::on(function ($data) use ($paymentMethodId) {
                 return $data['payment_method_id'] === $paymentMethodId &&
-                       $data['price_id'] === $this->plan->stripe_price_id;
+                       $data['price_id'] === $this->plan->stripe_price_id &&
+                       $data['user_id'] === $this->user->id;
             }))
             ->andReturn([
                 'success' => true,
-                'payment' => ['id' => 1, 'status' => 'completed'],
-                'subscription' => $mockStripeSubscription,
+                'payment' => (object)['id' => 1, 'status' => 'completed'], // Use object for consistency
+                'subscription' => (object)['id' => 'sub_123', /* other necessary Stripe subscription fields */],
                 'client_secret' => 'pi_123_secret_456'
             ]);
 
-        $response = $this->postJson('/api/subscriptions/subscribe', [ //
+        $response = $this->postJson('/api/subscriptions/subscribe', [
             'plan_id' => $this->plan->id,
             'payment_method_id' => $paymentMethodId,
         ]);
@@ -118,18 +113,18 @@ class SubscriptionControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.subscription.subscription_plan_id', $this->plan->id)
-            ->assertJsonPath('data.subscription.status', 'active');
+            ->assertJsonPath('data.subscription.status', 'active'); // Assuming successful payment activates it
 
-        $this->assertDatabaseHas('user_subscriptions', [ //
+        $this->assertDatabaseHas('user_subscriptions', [
             'user_id' => $this->user->id,
             'subscription_plan_id' => $this->plan->id,
-            'status' => 'active'
+            'status' => 'active' // Check for active status after successful payment
         ]);
     }
 
     public function test_can_cancel_active_subscription()
     {
-        $userSubscription = UserSubscription::factory()->create([ //
+        $userSubscription = UserSubscription::factory()->create([
             'user_id' => $this->user->id,
             'subscription_plan_id' => $this->plan->id,
             'status' => 'active',
@@ -139,15 +134,15 @@ class SubscriptionControllerTest extends TestCase
         $this->stripeServiceMock->shouldReceive('cancelSubscription')
             ->with('sub_active_123')
             ->once()
-            ->andReturn(['success' => true]);
+            ->andReturn(['success' => true, 'subscription' => (object)['status' => 'canceled']]);
 
-        $response = $this->postJson('/api/subscriptions/cancel'); //
+        $response = $this->postJson('/api/subscriptions/cancel');
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.subscription.status', 'cancelled');
 
-        $this->assertDatabaseHas('user_subscriptions', [ //
+        $this->assertDatabaseHas('user_subscriptions', [
             'id' => $userSubscription->id,
             'status' => 'cancelled'
         ]);
@@ -155,14 +150,14 @@ class SubscriptionControllerTest extends TestCase
 
     public function test_can_get_current_user_subscription()
     {
-        UserSubscription::factory()->create([ //
+        UserSubscription::factory()->create([
             'user_id' => $this->user->id,
             'subscription_plan_id' => $this->plan->id,
             'status' => 'active',
             'ends_at' => now()->addMonth()
         ]);
 
-        $response = $this->getJson('/api/subscriptions/current'); //
+        $response = $this->getJson('/api/subscriptions/current');
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')

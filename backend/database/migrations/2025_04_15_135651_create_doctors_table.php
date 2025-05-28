@@ -10,7 +10,8 @@ return new class extends Migration
         Schema::create('doctors', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
-            $table->foreignId('speciality_id')->constrained('specialities')->restrictOnDelete();
+            // Make speciality_id nullable to allow doctors to complete profile later
+            $table->foreignId('speciality_id')->nullable()->constrained('specialities')->nullOnDelete();
             $table->text('description')->nullable();
             $table->json('horaires')->nullable();
             $table->boolean('is_verified')->default(false);

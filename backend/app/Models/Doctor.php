@@ -7,12 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Factories\HasFactory; // Add this line
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\DB; // Import DB Facade
 
 class Doctor extends Model
 {
-    use SoftDeletes, HasFactory; // Add HasFactory here
+    use SoftDeletes, HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -27,7 +27,7 @@ class Doctor extends Model
     ];
 
     protected $casts = [
-        'horaires' => 'array',
+        'horaires' => 'array', // Ensures horaires is always an array
         'is_verified' => 'boolean',
         'is_active' => 'boolean',
         'average_rating' => 'float',
@@ -148,7 +148,11 @@ class Doctor extends Model
 
         if (!empty($filters['name'])) {
             $query->whereHas('user', function ($q) use ($filters) {
-                $q->where(DB::raw("CONCAT(prenom, ' ', nom)"), 'LIKE', '%' . $filters['name'] . '%');
+                // Use database-agnostic concatenation
+                $concatExpression = DB::connection()->getDriverName() === 'sqlite'
+                    ? "prenom || ' ' || nom"
+                    : "CONCAT(prenom, ' ', nom)";
+                $q->where(DB::raw($concatExpression), 'LIKE', '%' . $filters['name'] . '%');
             });
         }
 

@@ -12,8 +12,9 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Stripe\SetupIntent;
-use Stripe\PaymentMethod; // Added missing import for Stripe\PaymentMethod
+// Remove direct Stripe SDK imports if all calls are through the service
+// use Stripe\SetupIntent;
+// use Stripe\PaymentMethod;
 
 class SubscriptionController extends Controller
 {
@@ -37,8 +38,8 @@ class SubscriptionController extends Controller
                 'price' => $plan->price,
                 'billing_cycle' => $plan->billing_cycle,
                 'features' => $plan->features,
-                'stripe_price_id' => $plan->stripe_price_id ?? null, // Assuming you'll add this field
-                'popular' => $plan->name === 'Premium', // Mark specific plan as popular
+                'stripe_price_id' => $plan->stripe_price_id ?? null,
+                'popular' => $plan->name === 'Premium',
             ];
         });
 
@@ -57,10 +58,8 @@ class SubscriptionController extends Controller
             $user = Auth::user();
             $customer = $this->stripeService->getOrCreateCustomer($user);
 
-            $setupIntent = SetupIntent::create([
-                'customer' => $customer->id,
-                'payment_method_types' => ['card'],
-            ]);
+            // Use the service to create the SetupIntent
+            $setupIntent = $this->stripeService->createStripeSetupIntent($customer->id); // Assuming this method exists in your service
 
             return response()->json([
                 'status' => 'success',
@@ -84,7 +83,7 @@ class SubscriptionController extends Controller
     {
         $request->validate([
             'plan_id' => 'required|exists:abonnements,id',
-            'payment_method_id' => 'required|string', // Stripe payment method ID
+            'payment_method_id' => 'required|string',
         ]);
 
         try {
@@ -92,7 +91,6 @@ class SubscriptionController extends Controller
                 $user = Auth::user();
                 $plan = Abonnement::findOrFail($request->plan_id);
 
-                // Cancel any existing active subscription
                 $existingSubscription = UserSubscription::where('user_id', $user->id)
                     ->where('status', 'active')
                     ->first();
@@ -101,13 +99,11 @@ class SubscriptionController extends Controller
                     $this->cancelExistingSubscription($existingSubscription);
                 }
 
-                // Calculate subscription period
                 $startsAt = now();
                 $endsAt = $plan->billing_cycle === 'monthly'
                     ? $startsAt->copy()->addMonth()
                     : $startsAt->copy()->addYear();
 
-                // Create pending subscription
                 $subscription = UserSubscription::create([
                     'user_id' => $user->id,
                     'subscription_plan_id' => $plan->id,
@@ -120,7 +116,6 @@ class SubscriptionController extends Controller
                     ]
                 ]);
 
-                // Process payment with Stripe
                 $paymentResult = $this->stripeService->processPayment([
                     'amount' => $plan->price,
                     'currency' => 'MAD',
@@ -128,23 +123,19 @@ class SubscriptionController extends Controller
                     'user' => $user,
                     'subscription_id' => $subscription->id,
                     'subscription_plan_id' => $plan->id,
-                    'price_id' => $plan->stripe_price_id, // You'll need to add this field to abonnements table
+                    'price_id' => $plan->stripe_price_id,
                     'payment_method_id' => $request->payment_method_id,
                     'description' => "Abonnement {$plan->name} pour {$user->prenom} {$user->nom}",
                 ]);
 
                 if ($paymentResult['success']) {
-                    // Update subscription with Stripe details
                     $subscription->update([
                         'status' => 'active',
                         'payment_method' => array_merge($subscription->payment_method, [
                             'stripe_subscription_id' => $paymentResult['subscription']->id ?? null,
                         ])
                     ]);
-
-                    // Load relationships for response
                     $subscription->load('subscriptionPlan');
-
                     return response()->json([
                         'status' => 'success',
                         'message' => 'Abonnement créé avec succès',
@@ -156,13 +147,11 @@ class SubscriptionController extends Controller
                     ]);
                 }
 
-                // Payment failed
                 $subscription->update(['status' => 'cancelled']);
-
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Échec du paiement',
-                    'error' => $paymentResult['error']
+                    'error' => $paymentResult['error'] ?? 'Unknown payment error'
                 ], 400);
             });
         } catch (\Exception $e) {
@@ -193,21 +182,19 @@ class SubscriptionController extends Controller
                 ], 404);
             }
 
-            // Cancel Stripe subscription if exists
             if (!empty($subscription->payment_method['stripe_subscription_id'])) {
                 $result = $this->stripeService->cancelSubscription(
                     $subscription->payment_method['stripe_subscription_id']
                 );
-
                 if (!$result['success']) {
                     Log::error('Failed to cancel Stripe subscription', [
                         'subscription_id' => $subscription->id,
-                        'error' => $result['error']
+                        'error' => $result['error'] ?? 'Unknown Stripe cancellation error'
                     ]);
+                    // Optionally, decide if this should prevent local cancellation
                 }
             }
 
-            // Update subscription status
             $subscription->update([
                 'status' => 'cancelled',
                 'cancelled_at' => now()
@@ -253,23 +240,21 @@ class SubscriptionController extends Controller
                 ], 404);
             }
 
-            // Update default payment method in Stripe
-            $customer = $this->stripeService->getOrCreateCustomer($user);
+            // Use the service to update payment method
+            $result = $this->stripeService->updateSubscriptionPaymentMethod(
+                $user,
+                $subscription->payment_method['stripe_subscription_id'] ?? null, // Pass Stripe subscription ID if available
+                $request->payment_method_id
+            );
 
-            // Attach the payment method to the customer
-            $paymentMethod = PaymentMethod::retrieve($request->payment_method_id);
-            $paymentMethod->attach([
-                'customer' => $customer->id,
-            ]);
+            if (!$result['success']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to update payment method with Stripe',
+                    'error' => $result['error'] ?? 'Unknown error'
+                ], 500);
+            }
 
-            // Set the new payment method as the default for future invoices
-            \Stripe\Customer::update($customer->id, [
-                'invoice_settings' => [
-                    'default_payment_method' => $request->payment_method_id,
-                ],
-            ]);
-
-            // Update local record
             $subscription->update([
                 'payment_method' => array_merge($subscription->payment_method, [
                     'payment_method_id' => $request->payment_method_id,
@@ -291,9 +276,7 @@ class SubscriptionController extends Controller
         }
     }
 
-    /**
-     * Get user's current subscription
-     */
+
     public function getUserSubscription(): JsonResponse
     {
         $user = Auth::user();
@@ -310,7 +293,6 @@ class SubscriptionController extends Controller
             ]);
         }
 
-        // Get payment history
         $payments = Payment::where('user_subscription_id', $subscription->id)
             ->where('status', 'completed')
             ->orderBy('created_at', 'desc')
@@ -337,9 +319,6 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    /**
-     * Get subscription history
-     */
     public function getSubscriptionHistory(): JsonResponse
     {
         $user = Auth::user();
@@ -367,9 +346,6 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    /**
-     * Get payment history
-     */
     public function getPaymentHistory(): JsonResponse
     {
         $user = Auth::user();
@@ -388,7 +364,7 @@ class SubscriptionController extends Controller
                 'status' => $payment->status,
                 'payment_method' => $payment->payment_method,
                 'date' => $payment->created_at->format('Y-m-d H:i:s'),
-                'plan_name' => $payment->userSubscription->subscriptionPlan->name ?? 'One-time payment',
+                'plan_name' => $payment->userSubscription && $payment->userSubscription->subscriptionPlan ? $payment->userSubscription->subscriptionPlan->name : 'One-time payment',
                 'invoice_url' => $payment->payment_data['invoice_url'] ?? null,
             ];
         });
@@ -407,12 +383,8 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    /**
-     * Cancel existing subscription
-     */
     protected function cancelExistingSubscription(UserSubscription $subscription): void
     {
-        // Cancel Stripe subscription if exists
         if (!empty($subscription->payment_method['stripe_subscription_id'])) {
             try {
                 $this->stripeService->cancelSubscription(
@@ -422,10 +394,10 @@ class SubscriptionController extends Controller
                 Log::error('Failed to cancel existing Stripe subscription: ' . $e->getMessage());
             }
         }
-
         $subscription->update([
             'status' => 'cancelled',
             'cancelled_at' => now(),
         ]);
     }
+
 }

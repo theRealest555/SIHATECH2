@@ -12,6 +12,8 @@ use Stripe\Customer;
 use Stripe\Subscription;
 use Stripe\Webhook;
 use Stripe\Exception\SignatureVerificationException;
+use Stripe\SetupIntent; // Added this
+use Stripe\PaymentMethod; // Added this
 use Exception;
 
 class StripePaymentService
@@ -41,6 +43,59 @@ class StripePaymentService
             throw $e;
         }
     }
+
+    /**
+     * Create a Stripe SetupIntent for a customer.
+     */
+    public function createStripeSetupIntent(string $customerId): SetupIntent
+    {
+        try {
+            return SetupIntent::create([
+                'customer' => $customerId,
+                'payment_method_types' => ['card'],
+            ]);
+        } catch (Exception $e) {
+            Log::error('Stripe SetupIntent creation failed: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Update default payment method for a Stripe customer and their subscription.
+     */
+    public function updateSubscriptionPaymentMethod($user, ?string $stripeSubscriptionId, string $paymentMethodId): array
+    {
+        try {
+            $customer = $this->getOrCreateCustomer($user);
+
+            // Attach the new payment method to the customer
+            $paymentMethod = PaymentMethod::retrieve($paymentMethodId);
+            $paymentMethod->attach(['customer' => $customer->id]);
+
+            // Set as default for customer's invoices (for future subscriptions or direct invoices)
+            Customer::update($customer->id, [
+                'invoice_settings' => [
+                    'default_payment_method' => $paymentMethodId,
+                ],
+            ]);
+
+            // If there's an active Stripe subscription, update its default payment method too
+            if ($stripeSubscriptionId) {
+                Subscription::update($stripeSubscriptionId, [
+                    'default_payment_method' => $paymentMethodId,
+                ]);
+            }
+
+            return ['success' => true];
+        } catch (Exception $e) {
+            Log::error('Stripe payment method update failed: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'stripe_subscription_id' => $stripeSubscriptionId
+            ]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
 
     /**
      * Create a payment intent for one-time payment

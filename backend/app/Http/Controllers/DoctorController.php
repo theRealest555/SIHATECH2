@@ -35,6 +35,8 @@ class DoctorController extends Controller
                     'total_reviews' => $doctor->total_reviews,
                 ],
                 'photo' => $doctor->user ? $doctor->user->photo : null,
+                'is_verified' => $doctor->is_verified, // Added this
+                'is_active' => $doctor->is_active,   // Added this
             ]);
 
         return response()->json(['data' => $doctors]);
@@ -73,7 +75,7 @@ class DoctorController extends Controller
             ->with(['user', 'speciality', 'languages', 'location'])
             ->verified()
             ->active()
-            ->search($validated);
+            ->search($validated); // scopeSearch is in Doctor model
 
         switch ($sortBy) {
             case 'rating':
@@ -81,11 +83,12 @@ class DoctorController extends Controller
                 break;
             case 'name':
                 $query->join('users', 'doctors.user_id', '=', 'users.id')
-                    ->orderBy('users.nom', $sortOrder)
-                    ->select('doctors.*');
+                    ->orderBy('users.nom', $sortOrder) // Assuming you want to sort by last name
+                    ->orderBy('users.prenom', $sortOrder) // Then by first name
+                    ->select('doctors.*'); // Important to select from doctors table
                 break;
             case 'created_at':
-                $query->orderBy('created_at', $sortOrder);
+                $query->orderBy('doctors.created_at', $sortOrder); // Specify table for created_at
                 break;
             default:
                 $query->orderBy('average_rating', 'desc');
@@ -108,6 +111,7 @@ class DoctorController extends Controller
                 'photo' => $doctor->user ? $doctor->user->photo : null,
                 'description' => $doctor->description,
                 'is_verified' => $doctor->is_verified,
+                'is_active' => $doctor->is_active, // Added this line
             ];
 
             if (!empty($validated['date'])) {
@@ -209,7 +213,7 @@ class DoctorController extends Controller
     {
         try {
             $doctor = Doctor::findOrFail($doctorId);
-            $schedule = $doctor->horaires ?? [];
+            $schedule = $doctor->horaires ?? []; // Already an array due to model casting
             $leaves = $doctor->leaves;
 
             return response()->json([
@@ -304,31 +308,39 @@ class DoctorController extends Controller
             $horaires = $doctor->horaires ?? [];
             $dailySchedule = $horaires[$frenchDay] ?? [];
 
-            if (empty($dailySchedule)) {
-                return [];
-            }
+            Log::info('getAvailableSlots debug', [
+                'doctor_id' => $doctor->id,
+                'date' => $date,
+                'day' => $frenchDay, // Use frenchDay for logging
+                'horaires_from_db' => $doctor->getRawOriginal('horaires'), // Log raw value
+                'horaires_casted' => $horaires, // Log casted value
+                'daily_horaires' => $dailySchedule,
+            ]);
+
 
             $slots = [];
             $slotDuration = 30;
 
-            $timeRanges = $dailySchedule;
+            foreach ($dailySchedule as $timeRange) {
+                if (is_string($timeRange) && strpos($timeRange, '-') !== false) {
+                    [$start, $end] = explode('-', $timeRange);
+                    $start = trim($start);
+                    $end = trim($end);
 
-            foreach ($timeRanges as $timeRange) {
-                $timeRange = trim($timeRange);
-                if (strpos($timeRange, '-') === false) {
-                    continue;
-                }
+                    if (preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $start) &&
+                        preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $end)) {
+                        $startTime = Carbon::parse($date . ' ' . $start);
+                        $endTime = Carbon::parse($date . ' ' . $end);
 
-                [$start, $end] = explode('-', $timeRange);
-                $start = trim($start);
-                $end = trim($end);
-
-                $startTime = Carbon::parse($date . ' ' . $start);
-                $endTime = Carbon::parse($date . ' ' . $end);
-
-                while ($startTime < $endTime) {
-                    $slots[] = $startTime->format('H:i');
-                    $startTime->addMinutes($slotDuration);
+                        while ($startTime < $endTime) {
+                            $slots[] = $startTime->format('H:i');
+                            $startTime->addMinutes($slotDuration);
+                        }
+                    } else {
+                        Log::warning('Invalid time range format in schedule', ['timeRange' => $timeRange, 'doctor_id' => $doctor->id]);
+                    }
+                } else {
+                     Log::warning('Time range is not a valid string or format for doctor schedule', ['timeRange' => $timeRange, 'doctor_id' => $doctor->id]);
                 }
             }
 
@@ -365,11 +377,14 @@ class DoctorController extends Controller
 
         foreach ($days as $day) {
             if ($request->has($day) && !empty($request->input($day))) {
-                $horaires[$day] = $request->input($day);
+                // Assuming input is a comma-separated string of time ranges
+                $horaires[$day] = array_map('trim', explode(',', $request->input($day)));
+            } else {
+                $horaires[$day] = []; // Ensure empty array if no schedule for the day
             }
         }
 
-        $doctor->update(['horaires' => $horaires]);
+        $doctor->update(['horaires' => $horaires]); // Already an array, will be JSON encoded by model cast
 
         return response()->json([
             'message' => 'Schedule updated successfully',

@@ -32,7 +32,7 @@ class ReportControllerTest extends TestCase
         Payment::factory()->count(5)->create(['status' => 'completed', 'amount' => 100, 'created_at' => now()]);
         Payment::factory()->count(2)->create(['status' => 'completed', 'amount' => 50, 'created_at' => now()->subMonths(2)]);
 
-        $response = $this->getJson('/api/admin/reports/financial?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString()); //
+        $response = $this->getJson('/api/admin/reports/financial?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString());
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => [
@@ -52,7 +52,7 @@ class ReportControllerTest extends TestCase
         Rendezvous::factory()->count(3)->create(['doctor_id' => $doctor->id, 'statut' => 'terminé', 'created_at' => now()]);
         Rendezvous::factory()->count(2)->create(['doctor_id' => $doctor->id, 'statut' => 'annulé', 'created_at' => now()]);
 
-        $response = $this->getJson('/api/admin/reports/appointments?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString()); //
+        $response = $this->getJson('/api/admin/reports/appointments?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString());
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => [
@@ -71,7 +71,7 @@ class ReportControllerTest extends TestCase
     {
         Payment::factory()->count(2)->create(['status' => 'completed', 'amount' => 150]);
 
-        $response = $this->get('/api/admin/reports/export/financial?format=csv'); //
+        $response = $this->get('/api/admin/reports/export/financial?format=csv');
 
         $response->assertStatus(200)
             ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
@@ -81,6 +81,11 @@ class ReportControllerTest extends TestCase
         ob_start();
         echo $content;
         $csvOutput = ob_get_clean();
+
+        // Remove BOM if present for assertion
+        if (strpos($csvOutput, "\xEF\xBB\xBF") === 0) {
+            $csvOutput = substr($csvOutput, 3);
+        }
         $csvOutput = trim($csvOutput);
 
 
@@ -90,8 +95,8 @@ class ReportControllerTest extends TestCase
 
     public function test_admin_export_financial_report_handles_unsupported_format()
     {
-        $response = $this->getJson('/api/admin/reports/export/financial?format=xlsx'); //
+        $response = $this->getJson('/api/admin/reports/export/financial?format=xlsx');
         $response->assertStatus(501)
-                 ->assertJson(['message' => 'PDF export functionality requires additional setup']); // The controller message says PDF, but test is for xlsx. The actual check is if it's not CSV.
+                 ->assertJson(['message' => 'The requested export format is not supported. Please use CSV.']);
     }
 }

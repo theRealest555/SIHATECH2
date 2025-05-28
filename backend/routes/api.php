@@ -45,11 +45,9 @@ Route::middleware('guest')->group(function () {
 
     // Social Authentication
     Route::get('/auth/social/{provider}/redirect', [SocialiteAuthController::class, 'redirect'])
-        ->name('auth.social.redirect')
-        ->where('provider', 'google|facebook');
+        ->name('auth.social.redirect'); // Removed .where constraint
     Route::get('/auth/social/{provider}/callback', [SocialiteAuthController::class, 'callback'])
-        ->name('auth.social.callback')
-        ->where('provider', 'google|facebook');
+        ->name('auth.social.callback'); // Removed .where constraint
 });
 
 // Public Routes (No Authentication Required)
@@ -185,29 +183,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/stats/revenue', [DoctorStatisticsController::class, 'revenue'])->name('api.doctor.stats.revenue');
             Route::get('/stats/export', [DoctorStatisticsController::class, 'export'])->name('api.doctor.stats.export');
 
-            // Availability Management (for all doctors)
-            Route::get('/availability', function(Request $request) {
-                $doctor = $request->user()->doctor;
-                return app(AvailabilityController::class)->getAvailability($request, $doctor);
-            })->name('api.doctor.availability.show');
+            // Availability Management (for authenticated doctor)
+            Route::get('/availability', [AvailabilityController::class, 'getAvailability'])->name('api.doctor.availability.show');
 
             // Verified Doctor Routes
             Route::middleware(['verified.doctor'])->group(function () {
-                Route::put('/schedule', function(Request $request) {
-                    $doctor = $request->user()->doctor;
-                    return app(AvailabilityController::class)->updateSchedule($request, $doctor);
-                })->name('api.doctor.schedule.update');
-
-                Route::post('/leaves', function(Request $request) {
-                    $doctor = $request->user()->doctor;
-                    return app(AvailabilityController::class)->createLeave($request, $doctor);
-                })->name('api.doctor.leaves.store');
-
-                Route::delete('/leaves/{leave}', function(Request $request, $leaveId) {
-                    $doctor = $request->user()->doctor;
-                    $leave = \App\Models\Leave::findOrFail($leaveId);
-                    return app(AvailabilityController::class)->deleteLeave($request, $doctor, $leave);
-                })->name('api.doctor.leaves.destroy')->where('leave', '[0-9]+');
+                Route::put('/schedule', [AvailabilityController::class, 'updateSchedule'])->name('api.doctor.schedule.update');
+                Route::post('/leaves', [AvailabilityController::class, 'createLeave'])->name('api.doctor.leaves.store');
+                Route::delete('/leaves/{leave}', [AvailabilityController::class, 'deleteLeave'])->name('api.doctor.leaves.destroy')->where('leave', '[0-9]+');
             });
         });
 
@@ -263,7 +246,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/payments', [SubscriptionController::class, 'getPaymentHistory'])->name('api.subscriptions.payments');
         });
 
-        // General Appointments Route (accessible by doctors and patients)
+        // General Appointments Route (accessible by doctors and patients, filtered by role in controller)
         Route::get('/appointments', [AppointmentController::class, 'getAppointments'])->name('api.appointments.index');
     });
 });

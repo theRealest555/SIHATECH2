@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth; // Import Auth facade
 
 class AvailabilityController extends Controller
 {
@@ -20,6 +21,14 @@ class AvailabilityController extends Controller
      */
     public function getAvailability(Request $request, Doctor $doctor): JsonResponse
     {
+        // If $doctor is not passed (e.g. for authenticated doctor's own availability)
+        if (!$doctor->exists && Auth::check() && Auth::user()->doctor) {
+             $doctor = Auth::user()->doctor;
+        } elseif (!$doctor->exists) {
+            return response()->json(['status' => 'error', 'message' => 'Doctor not specified or found.'], 404);
+        }
+
+
         $leaves = Leave::where('doctor_id', $doctor->id)
             ->where('end_date', '>=', Carbon::today())
             ->get();
@@ -27,7 +36,7 @@ class AvailabilityController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'schedule' => json_decode($doctor->horaires ?? '{}', true),
+                'schedule' => $doctor->horaires ?? [], // Already an array due to model casting
                 'leaves' => $leaves,
             ],
         ]);
@@ -36,27 +45,48 @@ class AvailabilityController extends Controller
     /**
      * Update a doctor's schedule
      */
-    public function updateSchedule(UpdateScheduleRequest $request, Doctor $doctor): JsonResponse
+    public function updateSchedule(UpdateScheduleRequest $request): JsonResponse // Doctor will be from Auth
     {
+        $doctor = Auth::user()->doctor;
+        if (!$doctor) {
+            return response()->json(['status' => 'error', 'message' => 'Doctor profile not found for authenticated user.'], 404);
+        }
+
         $newSchedule = $request->validated()['schedule'];
 
         // Check for conflicts with existing appointments
         $conflicts = Rendezvous::where('doctor_id', $doctor->id)
-            ->whereNotIn('statut', ['annulé', 'terminé'])
-            ->whereDate('date_heure', '>=', Carbon::today())
+            ->whereNotIn('statut', ['annulé', 'terminé', 'no_show']) // Consider only active/pending appointments
+            ->whereDate('date_heure', '>=', Carbon::today()) // Only check future or today's appointments
             ->get()
             ->filter(function ($appointment) use ($newSchedule) {
-                $day = strtolower(Carbon::parse($appointment->date_heure)->format('l'));
+                $dayOfWeek = strtolower(Carbon::parse($appointment->date_heure)->format('l'));
+                 // Map English day names to French for horaires keys
+                $dayMap = [
+                    'monday' => 'lundi',
+                    'tuesday' => 'mardi',
+                    'wednesday' => 'mercredi',
+                    'thursday' => 'jeudi',
+                    'friday' => 'vendredi',
+                    'saturday' => 'samedi',
+                    'sunday' => 'dimanche',
+                ];
+                $day = $dayMap[$dayOfWeek] ?? $dayOfWeek;
+
                 $time = Carbon::parse($appointment->date_heure)->format('H:i');
                 $dailySchedule = $newSchedule[$day] ?? [];
 
+                $appointmentFits = false;
                 foreach ($dailySchedule as $range) {
-                    [$start, $end] = explode('-', $range);
-                    if ($time >= $start && $time < $end) {
-                        return false; // Appointment fits in new schedule
+                    if (is_string($range) && strpos($range, '-') !== false) {
+                        [$start, $end] = explode('-', $range);
+                        if ($time >= trim($start) && $time < trim($end)) {
+                            $appointmentFits = true;
+                            break;
+                        }
                     }
                 }
-                return true; // Conflict found
+                return !$appointmentFits; // Conflict if appointment does not fit
             });
 
         if ($conflicts->isNotEmpty()) {
@@ -66,7 +96,7 @@ class AvailabilityController extends Controller
             ], 409);
         }
 
-        $doctor->update(['horaires' => json_encode($newSchedule)]);
+        $doctor->update(['horaires' => $newSchedule]); // Already an array, will be JSON encoded by model cast
 
         Log::info('Schedule updated', ['doctor_id' => $doctor->id]);
 
@@ -79,15 +109,19 @@ class AvailabilityController extends Controller
     /**
      * Create a leave period for a doctor
      */
-    public function createLeave(CreateLeaveRequest $request, Doctor $doctor): JsonResponse
+    public function createLeave(CreateLeaveRequest $request): JsonResponse // Doctor will be from Auth
     {
+        $doctor = Auth::user()->doctor;
+         if (!$doctor) {
+            return response()->json(['status' => 'error', 'message' => 'Doctor profile not found for authenticated user.'], 404);
+        }
         $data = $request->validated();
 
         // Check for conflicts with existing appointments
         $conflicts = Rendezvous::where('doctor_id', $doctor->id)
-            ->whereNotIn('statut', ['annulé', 'terminé'])
+            ->whereNotIn('statut', ['annulé', 'terminé', 'no_show'])
             ->whereBetween('date_heure', [
-                Carbon::parse($data['start_date']),
+                Carbon::parse($data['start_date'])->startOfDay(),
                 Carbon::parse($data['end_date'])->endOfDay()
             ])
             ->exists();
@@ -123,8 +157,13 @@ class AvailabilityController extends Controller
     /**
      * Delete a leave period
      */
-    public function deleteLeave(Request $request, Doctor $doctor, Leave $leave): JsonResponse
+    public function deleteLeave(Request $request, Leave $leave): JsonResponse // Doctor will be from Auth
     {
+        $doctor = Auth::user()->doctor;
+         if (!$doctor) {
+            return response()->json(['status' => 'error', 'message' => 'Doctor profile not found for authenticated user.'], 404);
+        }
+
         if ($leave->doctor_id !== $doctor->id) {
             return response()->json([
                 'status' => 'error',
