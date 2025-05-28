@@ -7,15 +7,20 @@ use App\Models\Rendezvous;
 use App\Models\Payment;
 use App\Models\UserSubscription;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB; // Make sure DB facade is imported
+use Illuminate\Support\Facades\Log;
+
 
 class DoctorStatisticsService
 {
     protected $doctor;
+    protected $dbDriver;
 
     public function __construct(Doctor $doctor)
     {
         $this->doctor = $doctor;
+        // Determine the database driver once during instantiation
+        $this->dbDriver = DB::connection()->getDriverName();
     }
 
     /**
@@ -39,8 +44,8 @@ class DoctorStatisticsService
     protected function getOverviewStats(): array
     {
         $today = Carbon::today();
-        $thisMonth = Carbon::now()->startOfMonth();
-        $lastMonth = Carbon::now()->subMonth()->startOfMonth();
+        $thisMonthStart = Carbon::now()->startOfMonth();
+        // $lastMonthStart = Carbon::now()->subMonthNoOverflow()->startOfMonth(); // More robust way to get last month start
 
         return [
             'total_patients' => $this->getTotalUniquePatients(),
@@ -51,7 +56,7 @@ class DoctorStatisticsService
                 ->whereBetween('date_heure', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
                 ->count(),
             'appointments_this_month' => $this->doctor->appointments()
-                ->whereBetween('date_heure', [$thisMonth, Carbon::now()])
+                ->whereBetween('date_heure', [$thisMonthStart, Carbon::now()->endOfMonth()]) // Ensure full month coverage
                 ->count(),
             'rating' => [
                 'average' => $this->doctor->average_rating,
@@ -66,32 +71,34 @@ class DoctorStatisticsService
      */
     protected function getAppointmentStats(): array
     {
-        $appointments = $this->doctor->appointments()
+        $appointmentsQuery = $this->doctor->appointments();
+        $totalAppointments = $appointmentsQuery->count(); // Count all appointments for this doctor
+
+        $appointmentsByStatus = $this->doctor->appointments() // Re-query for by_status to avoid modifying the total count query
             ->selectRaw('statut, COUNT(*) as count')
             ->groupBy('statut')
             ->pluck('count', 'statut')
             ->toArray();
 
-        $totalAppointments = array_sum($appointments);
 
         return [
             'total' => $totalAppointments,
             'by_status' => [
-                'confirmed' => $appointments['confirmé'] ?? 0,
-                'pending' => $appointments['en_attente'] ?? 0,
-                'completed' => $appointments['terminé'] ?? 0,
-                'cancelled' => $appointments['annulé'] ?? 0,
-                'no_show' => $appointments['no_show'] ?? 0,
+                'confirmé' => $appointmentsByStatus['confirmé'] ?? 0,
+                'pending' => $appointmentsByStatus['en_attente'] ?? 0,
+                'completed' => $appointmentsByStatus['terminé'] ?? 0,
+                'cancelled' => $appointmentsByStatus['annulé'] ?? 0,
+                'no_show' => $appointmentsByStatus['no_show'] ?? 0,
             ],
             'rates' => [
                 'completion_rate' => $totalAppointments > 0
-                    ? round((($appointments['terminé'] ?? 0) / $totalAppointments) * 100, 2)
+                    ? round((($appointmentsByStatus['terminé'] ?? 0) / $totalAppointments) * 100, 2)
                     : 0,
                 'no_show_rate' => $totalAppointments > 0
-                    ? round((($appointments['no_show'] ?? 0) / $totalAppointments) * 100, 2)
+                    ? round((($appointmentsByStatus['no_show'] ?? 0) / $totalAppointments) * 100, 2)
                     : 0,
                 'cancellation_rate' => $totalAppointments > 0
-                    ? round((($appointments['annulé'] ?? 0) / $totalAppointments) * 100, 2)
+                    ? round((($appointmentsByStatus['annulé'] ?? 0) / $totalAppointments) * 100, 2)
                     : 0,
             ],
             'average_per_day' => $this->getAverageAppointmentsPerDay(),
@@ -105,16 +112,16 @@ class DoctorStatisticsService
     protected function getPatientStats(): array
     {
         $newPatientsThisMonth = $this->doctor->appointments()
-            ->selectRaw('patient_id, MIN(created_at) as first_appointment')
+            ->selectRaw('patient_id, MIN(created_at) as first_appointment_date') // Use a different alias
             ->groupBy('patient_id')
             ->havingRaw('MIN(created_at) >= ?', [Carbon::now()->startOfMonth()])
-            ->count();
+            ->get()->count(); // Use get()->count() to count the resulting collection
 
         $returningPatients = $this->doctor->appointments()
             ->selectRaw('patient_id, COUNT(*) as appointment_count')
             ->groupBy('patient_id')
             ->havingRaw('COUNT(*) > 1')
-            ->count();
+            ->get()->count(); // Use get()->count()
 
         $totalUniquePatients = $this->getTotalUniquePatients();
 
@@ -137,21 +144,23 @@ class DoctorStatisticsService
         $currentYear = Carbon::now()->year;
         $lastYear = Carbon::now()->subYear()->year;
 
-        // Get subscription payments for this doctor's user
+        $yearExtraction = $this->dbDriver === 'sqlite' ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+        $monthExtraction = $this->dbDriver === 'sqlite' ? "strftime('%m', created_at)" : "MONTH(created_at)";
+
         $currentYearRevenue = Payment::where('user_id', $this->doctor->user_id)
             ->where('status', 'completed')
-            ->whereYear('created_at', $currentYear)
+            ->whereRaw("{$yearExtraction} = ?", [$currentYear])
             ->sum('amount');
 
         $lastYearRevenue = Payment::where('user_id', $this->doctor->user_id)
             ->where('status', 'completed')
-            ->whereYear('created_at', $lastYear)
+            ->whereRaw("{$yearExtraction} = ?", [$lastYear])
             ->sum('amount');
 
-        $monthlyRevenue = Payment::where('user_id', $this->doctor->user_id)
+        $monthlyRevenueData = Payment::where('user_id', $this->doctor->user_id)
             ->where('status', 'completed')
-            ->whereYear('created_at', $currentYear)
-            ->selectRaw('MONTH(created_at) as month, SUM(amount) as total')
+            ->whereRaw("{$yearExtraction} = ?", [$currentYear])
+            ->selectRaw("CAST({$monthExtraction} AS INTEGER) as month, SUM(amount) as total")
             ->groupBy('month')
             ->pluck('total', 'month')
             ->toArray();
@@ -161,13 +170,14 @@ class DoctorStatisticsService
             'total_last_year' => $lastYearRevenue,
             'growth_percentage' => $lastYearRevenue > 0
                 ? round((($currentYearRevenue - $lastYearRevenue) / $lastYearRevenue) * 100, 2)
-                : 0,
-            'monthly_breakdown' => $this->formatMonthlyRevenue($monthlyRevenue),
-            'average_monthly' => count($monthlyRevenue) > 0
-                ? round(array_sum($monthlyRevenue) / count($monthlyRevenue), 2)
+                : ($currentYearRevenue > 0 ? 100 : 0),
+            'monthly_breakdown' => $this->formatMonthlyRevenue($monthlyRevenueData),
+            'average_monthly' => count($monthlyRevenueData) > 0
+                ? round(array_sum($monthlyRevenueData) / count($monthlyRevenueData), 2)
                 : 0,
         ];
     }
+
 
     /**
      * Get performance metrics
@@ -176,14 +186,12 @@ class DoctorStatisticsService
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        // Average consultation duration (assuming 30 minutes per appointment)
         $completedAppointments = $this->doctor->appointments()
             ->where('statut', 'terminé')
             ->where('date_heure', '>=', $thirtyDaysAgo)
             ->count();
 
-        // Patient satisfaction from reviews
-        $recentReviews = $this->doctor->approvedReviews()
+        $recentReviews = $this->doctor->approvedReviews() // Assuming approvedReviews is a scope or relationship
             ->where('created_at', '>=', $thirtyDaysAgo)
             ->selectRaw('AVG(rating) as avg_rating, COUNT(*) as count')
             ->first();
@@ -205,51 +213,52 @@ class DoctorStatisticsService
     protected function getTrendsData(): array
     {
         $sixMonthsAgo = Carbon::now()->subMonths(6)->startOfMonth();
+        $dateFormat = $this->dbDriver === 'sqlite' ? "strftime('%Y-%m', date_heure)" : "DATE_FORMAT(date_heure, '%Y-%m')";
 
-        // Appointments trend
         $appointmentsTrend = $this->doctor->appointments()
             ->where('date_heure', '>=', $sixMonthsAgo)
-            ->selectRaw('DATE_FORMAT(date_heure, "%Y-%m") as month, COUNT(*) as count')
-            ->groupBy('month')
-            ->orderBy('month')
+            ->selectRaw("{$dateFormat} as month_year, COUNT(*) as count") // Use month_year to avoid conflict with month keyword
+            ->groupBy('month_year')
+            ->orderBy('month_year')
             ->get()
             ->map(function ($item) {
                 return [
-                    'month' => Carbon::createFromFormat('Y-m', $item->month)->format('M Y'),
+                    'month' => Carbon::createFromFormat('Y-m', $item->month_year)->format('M Y'),
                     'count' => $item->count,
                 ];
             });
 
-        // No-show trend
-        $noShowTrend = $this->doctor->appointments()
+        $noShowTrendData = $this->doctor->appointments()
             ->where('date_heure', '>=', $sixMonthsAgo)
             ->where('statut', 'no_show')
-            ->selectRaw('DATE_FORMAT(date_heure, "%Y-%m") as month, COUNT(*) as count')
-            ->groupBy('month')
-            ->orderBy('month')
-            ->pluck('count', 'month')
+            ->selectRaw("{$dateFormat} as month_year, COUNT(*) as count")
+            ->groupBy('month_year')
+            ->orderBy('month_year')
+            ->pluck('count', 'month_year')
             ->toArray();
+        $noShowTrend = $this->formatNoShowTrend($noShowTrendData);
 
-        // Patient growth trend
+
         $patientGrowth = $this->doctor->appointments()
             ->where('date_heure', '>=', $sixMonthsAgo)
-            ->selectRaw('DATE_FORMAT(date_heure, "%Y-%m") as month, COUNT(DISTINCT patient_id) as unique_patients')
-            ->groupBy('month')
-            ->orderBy('month')
+            ->selectRaw("{$dateFormat} as month_year, COUNT(DISTINCT patient_id) as unique_patients")
+            ->groupBy('month_year')
+            ->orderBy('month_year')
             ->get()
             ->map(function ($item) {
                 return [
-                    'month' => Carbon::createFromFormat('Y-m', $item->month)->format('M Y'),
+                    'month' => Carbon::createFromFormat('Y-m', $item->month_year)->format('M Y'),
                     'patients' => $item->unique_patients,
                 ];
             });
 
         return [
             'appointments' => $appointmentsTrend,
-            'no_shows' => $this->formatNoShowTrend($noShowTrend),
+            'no_shows' => $noShowTrend,
             'patient_growth' => $patientGrowth,
         ];
     }
+
 
     /**
      * Get total unique patients
@@ -283,15 +292,21 @@ class DoctorStatisticsService
      */
     protected function getPeakAppointmentHours(): array
     {
-        return $this->doctor->appointments()
-            ->selectRaw('HOUR(date_heure) as hour, COUNT(*) as count')
-            ->groupBy('hour')
+        $query = $this->doctor->appointments();
+
+        if ($this->dbDriver === 'sqlite') {
+            $query->selectRaw("strftime('%H', date_heure) as appointment_hour, COUNT(*) as count");
+        } else {
+            $query->selectRaw('HOUR(date_heure) as appointment_hour, COUNT(*) as count');
+        }
+
+        return $query->groupBy('appointment_hour') // Use a different alias if 'hour' is a reserved keyword
             ->orderByDesc('count')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 return [
-                    'hour' => sprintf('%02d:00', $item->hour),
+                    'hour' => sprintf('%02d:00', $item->appointment_hour),
                     'count' => $item->count,
                 ];
             })
@@ -303,15 +318,31 @@ class DoctorStatisticsService
      */
     protected function getPatientDemographics(): array
     {
+        $ageCalculationSelect = '';
+
+        if ($this->dbDriver === 'sqlite') {
+            // For SQLite: Calculate age using strftime
+            // This calculates age based on year difference, then adjusts if birthday hasn't occurred yet this year.
+            $ageCalculationSelect = "AVG(
+                CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', users.date_de_naissance) AS INTEGER) -
+                (CASE WHEN strftime('%m-%d', 'now') < strftime('%m-%d', users.date_de_naissance) THEN 1 ELSE 0 END)
+            ) as avg_age";
+        } else {
+            // For MySQL: Use TIMESTAMPDIFF
+            $ageCalculationSelect = "AVG(TIMESTAMPDIFF(YEAR, users.date_de_naissance, CURDATE())) as avg_age";
+        }
+
         $demographics = DB::table('rendezvous')
             ->join('users', 'rendezvous.patient_id', '=', 'users.id')
+            // ->join('patients', 'users.id', '=', 'patients.user_id') // Assuming patient_id in rendezvous is user_id
             ->where('rendezvous.doctor_id', $this->doctor->id)
-            ->selectRaw('
+            ->whereNotNull('users.date_de_naissance') // Ensure date_de_naissance is not null for age calculation
+            ->selectRaw("
                 COUNT(DISTINCT users.id) as total,
-                SUM(CASE WHEN users.sexe = "homme" THEN 1 ELSE 0 END) as male,
-                SUM(CASE WHEN users.sexe = "femme" THEN 1 ELSE 0 END) as female,
-                AVG(TIMESTAMPDIFF(YEAR, users.date_de_naissance, CURDATE())) as avg_age
-            ')
+                SUM(CASE WHEN users.sexe = 'homme' THEN 1 ELSE 0 END) as male,
+                SUM(CASE WHEN users.sexe = 'femme' THEN 1 ELSE 0 END) as female,
+                {$ageCalculationSelect}
+            ")
             ->first();
 
         return [
@@ -323,6 +354,7 @@ class DoctorStatisticsService
             'average_age' => round($demographics->avg_age ?? 0),
         ];
     }
+
 
     /**
      * Get subscription status
@@ -340,6 +372,7 @@ class DoctorStatisticsService
                 'active' => false,
                 'plan' => null,
                 'expires_at' => null,
+                'days_remaining' => 0,
             ];
         }
 
@@ -352,56 +385,64 @@ class DoctorStatisticsService
     }
 
     /**
-     * Calculate average response time (placeholder - would need actual response tracking)
+     * Calculate average response time (placeholder)
      */
     protected function getAverageResponseTime(): string
     {
-        // This is a placeholder. In a real implementation, you would track
-        // when appointments are requested vs when they are confirmed
-        return '< 2 hours';
+        return '< 2 hours'; // Placeholder
     }
 
     /**
-     * Calculate availability score based on schedule and appointments
+     * Calculate availability score
      */
     protected function calculateAvailabilityScore(): int
     {
-        // Calculate based on:
-        // - Number of available hours per week
-        // - Percentage of slots filled
-        // - Number of leaves taken
+        // Example: 8 hours/day * 5 days (can be made more dynamic based on actual schedule)
+        $scheduledWeeklyHours = 0;
+        if (is_array($this->doctor->horaires)) {
+            foreach ($this->doctor->horaires as $daySchedule) {
+                if (is_array($daySchedule)) {
+                    foreach ($daySchedule as $timeRange) {
+                        if (is_string($timeRange) && strpos($timeRange, '-') !== false) {
+                             try {
+                                [$start, $end] = explode('-', $timeRange);
+                                $startTime = Carbon::parse($start);
+                                $endTime = Carbon::parse($end);
+                                $scheduledWeeklyHours += $endTime->diffInHours($startTime);
+                            } catch (\Exception $e) {
+                                Log::warning("Could not parse time range for availability score: " . $timeRange);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $totalSlotsApproximation = $scheduledWeeklyHours * 2; // Assuming 30 min slots
 
-        $totalSlots = 40; // Example: 8 hours/day * 5 days
-        $bookedSlots = $this->doctor->appointments()
+        $bookedSlotsThisWeek = $this->doctor->appointments()
             ->whereBetween('date_heure', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
+            ->whereNotIn('statut', ['annulé', 'no_show'])
             ->count();
 
-        $utilizationRate = $totalSlots > 0 ? ($bookedSlots / $totalSlots) * 100 : 0;
+        $utilizationRate = $totalSlotsApproximation > 0 ? ($bookedSlotsThisWeek / $totalSlotsApproximation) * 100 : 0;
 
-        // Score based on utilization (not too low, not too high)
-        if ($utilizationRate < 30) {
-            return 60; // Low utilization
-        } elseif ($utilizationRate > 90) {
-            return 70; // Over-booked
-        } else {
-            return min(100, 70 + ($utilizationRate - 30) * 0.5); // Optimal range
-        }
+        if ($utilizationRate < 30) return 60;
+        if ($utilizationRate > 90) return 70;
+        return min(100, intval(70 + ($utilizationRate - 30) * 0.5));
     }
 
     /**
      * Format monthly revenue data
      */
-    protected function formatMonthlyRevenue(array $monthlyRevenue): array
+    protected function formatMonthlyRevenue(array $monthlyRevenueData): array
     {
         $formatted = [];
-
         for ($month = 1; $month <= 12; $month++) {
             $formatted[] = [
                 'month' => Carbon::create(null, $month)->format('M'),
-                'revenue' => $monthlyRevenue[$month] ?? 0,
+                'revenue' => $monthlyRevenueData[$month] ?? 0,
             ];
         }
-
         return $formatted;
     }
 
@@ -411,14 +452,16 @@ class DoctorStatisticsService
     protected function formatNoShowTrend(array $noShowData): array
     {
         $formatted = [];
-
-        foreach ($noShowData as $month => $count) {
+        // Ensure months are in order and fill missing ones with 0
+        $currentMonth = Carbon::now()->subMonths(5)->startOfMonth(); // Start 6 months ago including current
+        for ($i = 0; $i < 6; $i++) {
+            $monthKey = $currentMonth->format('Y-m');
             $formatted[] = [
-                'month' => Carbon::createFromFormat('Y-m', $month)->format('M Y'),
-                'count' => $count,
+                'month' => $currentMonth->format('M Y'),
+                'count' => $noShowData[$monthKey] ?? 0,
             ];
+            $currentMonth->addMonth();
         }
-
         return $formatted;
     }
 }
