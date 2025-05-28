@@ -29,8 +29,8 @@ class DoctorFactory extends Factory
             ]),
             'is_verified' => $this->faker->boolean(80), // 80% chance of being verified
             'is_active' => true,
-            'average_rating' => $this->faker->optional()->randomFloat(1, 3, 5),
-            'total_reviews' => $this->faker->optional()->numberBetween(0, 100),
+            'average_rating' => $this->faker->randomFloat(1, 0, 5), // Provide a default, e.g., 0 or a random float
+            'total_reviews' => $this->faker->numberBetween(0, 100),   // Provide a default
         ];
     }
 }

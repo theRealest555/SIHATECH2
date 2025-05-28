@@ -5,9 +5,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory; // Add this line
 
 class Payment extends Model
 {
+    use HasFactory; // Add this line
+
     protected $fillable = [
         'user_id',
         'user_subscription_id',

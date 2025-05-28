@@ -5,6 +5,8 @@ namespace Database\Factories;
 use App\Models\Avis;
 use App\Models\User;
 use App\Models\Rendezvous;
+use App\Models\Doctor; // Ensure Doctor model is imported if used explicitly
+use App\Models\Patient; // Ensure Patient model is imported
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class AvisFactory extends Factory
@@ -25,17 +27,32 @@ class AvisFactory extends Factory
     {
         // Ensure patient and doctor users exist or create them
         $patientUser = User::factory()->create(['role' => 'patient']);
-        $doctorUser = User::factory()->create(['role' => 'medecin']);
+        // Ensure the patient has a patient profile record
+        if (!$patientUser->patient) {
+            Patient::factory()->create(['user_id' => $patientUser->id]); // Add this block
+        }
+        // Refresh the $patientUser to get the loaded relationship
+        $patientUser->refresh();
 
+
+        $doctorUser = User::factory()->create(['role' => 'medecin']);
         // Ensure the doctor has a doctor profile record
         if (!$doctorUser->doctor) {
-            \App\Models\Doctor::factory()->create(['user_id' => $doctorUser->id]);
+            // Using \App\Models\Doctor::factory() or just Doctor::factory() if imported
+            Doctor::factory()->create(['user_id' => $doctorUser->id]);
         }
+        // Refresh the $doctorUser to get the loaded relationship
+        $doctorUser->refresh();
+
 
         // Create an appointment for context, or handle null rendezvous_id
+        // Ensure that $patientUser->patient and $doctorUser->doctor are not null
+        // The refresh above should help, but an extra check or direct creation might be safer
+        // For RendezvousFactory, it also creates users, so we use the users created here.
+
         $rendezvous = Rendezvous::factory()->create([
-            'patient_id' => $patientUser->patient->id, // Assuming patient_id in rendezvous refers to patients table id
-            'doctor_id' => $doctorUser->doctor->id, // Assuming doctor_id in rendezvous refers to doctors table id
+            'patient_id' => $patientUser->patient->id, // Now $patientUser->patient should exist
+            'doctor_id' => $doctorUser->doctor->id,   // $doctorUser->doctor exists due to the check
         ]);
 
 
@@ -51,6 +68,7 @@ class AvisFactory extends Factory
         ];
     }
 
+    // ... rest of the factory states (pending, approved, rejected)
     /**
      * Indicate that the review is pending.
      *
@@ -73,10 +91,12 @@ class AvisFactory extends Factory
     public function approved()
     {
         return $this->state(function (array $attributes) {
+            // Ensure an admin user exists or create one
+            $adminUser = User::where('role', 'admin')->first() ?? User::factory()->admin()->create();
             return [
                 'status' => 'approved',
                 'moderated_at' => now(),
-                'moderated_by' => User::factory()->admin()->create()->id, // Assign a moderator
+                'moderated_by' => $adminUser->id, // Assign a moderator
             ];
         });
     }
@@ -89,10 +109,12 @@ class AvisFactory extends Factory
     public function rejected()
     {
         return $this->state(function (array $attributes) {
+             // Ensure an admin user exists or create one
+            $adminUser = User::where('role', 'admin')->first() ?? User::factory()->admin()->create();
             return [
                 'status' => 'rejected',
                 'moderated_at' => now(),
-                'moderated_by' => User::factory()->admin()->create()->id, // Assign a moderator
+                'moderated_by' => $adminUser->id, // Assign a moderator
             ];
         });
     }
