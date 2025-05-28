@@ -88,9 +88,12 @@ class ReportControllerTest extends TestCase
         }
         $csvOutput = trim($csvOutput);
 
+        $lines = explode("\n", $csvOutput);
+        $actualHeader = rtrim($lines[0], "\r"); // Remove potential trailing carriage return
+        $expectedHeader = 'ID,Nom du patient,Email,Montant,"Méthode de paiement",Statut,"Date de paiement",Abonnement';
 
-        $this->assertStringContainsString('ID,Nom du patient,Email,Montant,"Méthode de paiement",Statut,"Date de paiement",Abonnement', $csvOutput);
-        $this->assertStringContainsString('150', $csvOutput); // Check if amount is present
+        $this->assertEquals($expectedHeader, $actualHeader, "CSV header does not match.");
+        $this->assertStringContainsString('150', $csvOutput); // Check if amount is present in the body
     }
 
     public function test_admin_export_financial_report_handles_unsupported_format()

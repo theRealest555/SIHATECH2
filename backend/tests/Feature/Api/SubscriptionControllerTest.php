@@ -60,19 +60,18 @@ class SubscriptionControllerTest extends TestCase
 
     public function test_can_get_stripe_setup_intent()
     {
-        // Mock the service method that encapsulates Stripe SDK calls
+        // Mock the Stripe\Customer object
+        $mockStripeCustomer = Mockery::mock('Stripe\Customer');
+        $mockStripeCustomer->id = 'cus_123'; // Set the id property on the mock
+
         $this->stripeServiceMock
             ->shouldReceive('getOrCreateCustomer')
-            ->with($this->user) // Ensure the correct user is passed
-            ->andReturn((object)['id' => 'cus_123']); // Return a simple object or array
+            ->with($this->user)
+            ->andReturn($mockStripeCustomer); // Return the mocked Stripe\Customer object
 
-        // Assume SubscriptionController calls a method in StripePaymentService to create setup intent
-        // This makes the controller easier to test.
-        // If SubscriptionController calls Stripe\SetupIntent::create directly, this test would be more complex.
-        // Let's assume a method like createStripeSetupIntent exists in your service.
         $this->stripeServiceMock
-            ->shouldReceive('createStripeSetupIntent') // This method needs to exist in StripePaymentService
-            ->with('cus_123') // Customer ID
+            ->shouldReceive('createStripeSetupIntent')
+            ->with('cus_123')
             ->andReturn((object)['client_secret' => 'seti_123_secret_456']);
 
 
@@ -100,8 +99,8 @@ class SubscriptionControllerTest extends TestCase
             }))
             ->andReturn([
                 'success' => true,
-                'payment' => (object)['id' => 1, 'status' => 'completed'], // Use object for consistency
-                'subscription' => (object)['id' => 'sub_123', /* other necessary Stripe subscription fields */],
+                'payment' => (object)['id' => 1, 'status' => 'completed'],
+                'subscription' => (object)['id' => 'sub_123'],
                 'client_secret' => 'pi_123_secret_456'
             ]);
 
@@ -113,12 +112,12 @@ class SubscriptionControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.subscription.subscription_plan_id', $this->plan->id)
-            ->assertJsonPath('data.subscription.status', 'active'); // Assuming successful payment activates it
+            ->assertJsonPath('data.subscription.status', 'active');
 
         $this->assertDatabaseHas('user_subscriptions', [
             'user_id' => $this->user->id,
             'subscription_plan_id' => $this->plan->id,
-            'status' => 'active' // Check for active status after successful payment
+            'status' => 'active'
         ]);
     }
 

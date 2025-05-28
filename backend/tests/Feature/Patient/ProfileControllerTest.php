@@ -22,6 +22,9 @@ class ProfileControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Ensure Storage is faked for tests involving file uploads
+        Storage::fake('public');
+
         $this->patientUser = User::factory()->create(['role' => 'patient', 'email_verified_at' => now(), 'status' => 'actif']); //
         $this->patient = Patient::factory()->create(['user_id' => $this->patientUser->id]); //
         Sanctum::actingAs($this->patientUser, ['role:patient']);
@@ -78,6 +81,7 @@ class ProfileControllerTest extends TestCase
             'password_confirmation' => 'newSecurePassword123',
         ];
 
+        // Ensure the user's current password is 'password'
         $this->patientUser->update(['password' => Hash::make('password')]);
 
         $response = $this->putJson('/api/patient/profile/password', $passwordData); //
@@ -90,6 +94,9 @@ class ProfileControllerTest extends TestCase
 
     public function test_patient_cannot_update_password_with_incorrect_current_password()
     {
+        // Ensure the user's current password is 'password'
+        $this->patientUser->update(['password' => Hash::make('password')]);
+
         $passwordData = [
             'current_password' => 'wrongOldPassword',
             'password' => 'newSecurePassword123',
@@ -104,7 +111,7 @@ class ProfileControllerTest extends TestCase
 
     public function test_patient_can_update_profile_photo()
     {
-        Storage::fake('public');
+        // Storage::fake('public'); // Moved to setUp for all tests in this class
         $file = UploadedFile::fake()->image('avatar.jpg');
 
         $response = $this->postJson('/api/patient/profile/photo', ['photo' => $file]); //

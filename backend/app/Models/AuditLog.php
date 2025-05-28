@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class AuditLog extends Model
 {
     use HasFactory;
-    protected $fillable = ['user_id', 'action', 'target_type', 'target_id'];
+    // MODIFIED LINE: Added 'metadata' to the $fillable array
+    protected $fillable = ['user_id', 'action', 'target_type', 'target_id', 'metadata'];
 
     public function admin(): BelongsTo
     {
