@@ -4,15 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory; // Add this line
 
 class Avis extends Model
 {
+    use HasFactory; // Add this line
+
     protected $table = 'reviews'; // Correct table name from migration
 
     protected $fillable = [
         'patient_id',
         'doctor_id',
-        'appointment_id',
+        'appointment_id', // Corrected from rendezvous_id to match migration
         'rating',
         'comment',
         'status',
@@ -38,6 +41,7 @@ class Avis extends Model
      */
     public function doctor(): BelongsTo
     {
+        // Assuming doctor_id in reviews table refers to the user_id of the doctor
         return $this->belongsTo(User::class, 'doctor_id');
     }
 
@@ -46,7 +50,8 @@ class Avis extends Model
      */
     public function appointment(): BelongsTo
     {
-        return $this->belongsTo(Rendezvous::class, 'appointment_id');
+        // Corrected foreign key to match migration: rendezvous_id
+        return $this->belongsTo(Rendezvous::class, 'rendezvous_id');
     }
 
     /**

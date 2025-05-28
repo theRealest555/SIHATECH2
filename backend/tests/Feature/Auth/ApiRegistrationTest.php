@@ -43,16 +43,12 @@ class ApiRegistrationTest extends TestCase
                 'user' => ['id', 'nom', 'prenom', 'email', 'role', 'status', 'email_verified_at'],
                 'token',
             ])
-            ->assertJsonFragment([
-                'user' => [
-                    'nom' => 'Test',
-                    'prenom' => 'Patient',
-                    'email' => 'patient@example.com',
-                    'status' => 'actif',
-                    'email_verified_at' => null,
-                    'role' => 'patient',
-                ]
-            ]);
+            ->assertJsonPath('user.nom', 'Test') // MODIFIED LINE
+            ->assertJsonPath('user.prenom', 'Patient') // MODIFIED LINE
+            ->assertJsonPath('user.email', 'patient@example.com') // MODIFIED LINE
+            ->assertJsonPath('user.status', 'actif') // MODIFIED LINE
+            ->assertJsonPath('user.email_verified_at', null) // MODIFIED LINE
+            ->assertJsonPath('user.role', 'patient'); // MODIFIED LINE
 
         $this->assertDatabaseHas('users', [
             'email' => 'patient@example.com',

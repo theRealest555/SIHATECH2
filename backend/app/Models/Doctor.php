@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory; // Add this line
 use Illuminate\Support\Facades\DB;
 
 class Doctor extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory; // Add HasFactory here
 
     protected $fillable = [
         'user_id',

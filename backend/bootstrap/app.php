@@ -6,6 +6,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use \Illuminate\Support\Facades\RateLimiter as RateLimiter;
+
 
 // Remove the globally defined functions:
 // renderAuthException, renderValidationException, renderGeneralException
@@ -19,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+
+        RateLimiter::for('api', function (Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
         // API middleware stack with Sanctum
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
@@ -37,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/EnsureEmailIsVerified.php]
-
+            
             // Custom middleware
             'role' => \App\Http\Middleware\RoleMiddleware::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/RoleMiddleware.php]
             'verified.doctor' => \App\Http\Middleware\VerifiedDoctor::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/VerifiedDoctor.php]

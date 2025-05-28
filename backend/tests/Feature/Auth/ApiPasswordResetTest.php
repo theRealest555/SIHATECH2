@@ -44,7 +44,7 @@ class ApiPasswordResetTest extends TestCase
         Event::fake(PasswordResetEvent::class);
 
         $user = User::factory()->create();
-        $token = app('auth.password.tokens')->create($user); // Get a valid token
+        $token = Password::createToken($user);
 
         $newPassword = 'newSecurePassword123';
         $response = $this->postJson('/api/reset-password', [ // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/routes/api.php]
@@ -82,8 +82,7 @@ class ApiPasswordResetTest extends TestCase
     public function test_password_reset_fails_with_mismatched_passwords_via_api(): void
     {
         $user = User::factory()->create();
-        $token = app('auth.password.tokens')->create($user);
-
+        $token = Password::createToken($user);
         $response = $this->postJson('/api/reset-password', [ // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/routes/api.php]
             'token' => $token,
             'email' => $user->email,

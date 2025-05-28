@@ -57,10 +57,10 @@ Route::group(['prefix' => 'public'], function () {
     // Public Doctor Information
     Route::get('/doctors', [DoctorController::class, 'index'])->name('api.public.doctors.index');
     Route::get('/doctors/search', [DoctorController::class, 'search'])->name('api.public.doctors.search');
-    Route::get('/doctors/{doctor}', [DoctorController::class, 'show'])->name('api.public.doctors.show');
-    Route::get('/doctors/{doctor}/statistics', [DoctorController::class, 'statistics'])->name('api.public.doctors.statistics');
-    Route::get('/doctors/{doctor}/availability', [AvailabilityController::class, 'getAvailability'])->name('api.public.doctors.availability');
-    Route::get('/doctors/{doctor}/slots', [AppointmentController::class, 'getAvailableSlots'])->name('api.public.doctors.slots');
+    Route::get('/doctors/{doctor}', [DoctorController::class, 'show'])->name('api.public.doctors.show')->where('doctor', '[0-9]+');
+    Route::get('/doctors/{doctor}/statistics', [DoctorController::class, 'statistics'])->name('api.public.doctors.statistics')->where('doctor', '[0-9]+');
+    Route::get('/doctors/{doctor}/availability', [AvailabilityController::class, 'getAvailability'])->name('api.public.doctors.availability')->where('doctor', '[0-9]+');
+    Route::get('/doctors/{doctor}/slots', [AppointmentController::class, 'getAvailableSlots'])->name('api.public.doctors.slots')->where('doctor', '[0-9]+');
 
     // Public Resources
     Route::get('/specialities', [DoctorController::class, 'specialities'])->name('api.public.specialities');
@@ -72,7 +72,7 @@ Route::group(['prefix' => 'public'], function () {
 Route::group(['prefix' => 'email'], function () {
     Route::get('/verify/{id}/{hash}', [VerifyEmailController::class, '__invoke'])
         ->middleware(['signed', 'throttle:6,1'])
-        ->name('verification.verify');
+        ->name('verification.verify')->where('id', '[0-9]+');
     Route::get('/verify/error', [VerifyEmailController::class, 'error'])
         ->name('verification.error');
 });
@@ -153,8 +153,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
             // Patient Appointments
             Route::get('/appointments', [AppointmentController::class, 'getAppointments'])->name('api.patient.appointments.index');
-            Route::post('/doctors/{doctorId}/appointments', [AppointmentController::class, 'bookAppointment'])->name('api.patient.appointments.book');
-            Route::patch('/appointments/{rendezvous}/status', [AppointmentController::class, 'updateAppointmentStatus'])->name('api.patient.appointments.update-status');
+            Route::post('/doctors/{doctorId}/appointments', [AppointmentController::class, 'bookAppointment'])->name('api.patient.appointments.book')->where('doctorId', '[0-9]+');
+            Route::patch('/appointments/{rendezvous}/status', [AppointmentController::class, 'updateAppointmentStatus'])->name('api.patient.appointments.update-status')->where('rendezvous', '[0-9]+');
         });
 
         // Doctor Routes
@@ -169,13 +169,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
             // Document Management
             Route::get('/documents', [DocumentController::class, 'index'])->name('api.doctor.documents.index');
             Route::post('/documents', [DocumentController::class, 'store'])->name('api.doctor.documents.store');
-            Route::get('/documents/{id}', [DocumentController::class, 'show'])->name('api.doctor.documents.show');
-            Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])->name('api.doctor.documents.destroy');
+            Route::get('/documents/{id}', [DocumentController::class, 'show'])->name('api.doctor.documents.show')->where('id', '[0-9]+');
+            Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])->name('api.doctor.documents.destroy')->where('id', '[0-9]+');
 
             // Appointments Management
             Route::get('/appointments', [AppointmentController::class, 'getAppointments'])->name('api.doctor.appointments.index');
-            Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus'])->name('api.doctor.appointments.update-status');
-            Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'markAsNoShow'])->name('api.doctor.appointments.mark-no-show');
+            Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus'])->name('api.doctor.appointments.update-status')->where('id', '[0-9]+');
+            Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'markAsNoShow'])->name('api.doctor.appointments.mark-no-show')->where('id', '[0-9]+');
             Route::get('/appointments/no-show-stats', [AppointmentController::class, 'getNoShowStats'])->name('api.doctor.appointments.no-show-stats');
 
             // Statistics
@@ -207,7 +207,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
                     $doctor = $request->user()->doctor;
                     $leave = \App\Models\Leave::findOrFail($leaveId);
                     return app(AvailabilityController::class)->deleteLeave($request, $doctor, $leave);
-                })->name('api.doctor.leaves.destroy');
+                })->name('api.doctor.leaves.destroy')->where('leave', '[0-9]+');
             });
         });
 
@@ -216,33 +216,34 @@ Route::middleware(['auth:sanctum'])->group(function () {
             // Dashboard
             Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('api.admin.dashboard');
 
+            // User Data Export (Define specific route before parameterized one)
+            Route::get('/users/export', [AdminController::class, 'exportUserData'])->name('api.admin.users.export');
+
             // User Management
             Route::get('/users', [UserController::class, 'index'])->name('api.admin.users.index');
             Route::post('/users/admin', [UserController::class, 'storeAdmin'])->name('api.admin.users.store-admin');
-            Route::get('/users/{id}', [UserController::class, 'show'])->name('api.admin.users.show');
-            Route::put('/users/{id}/status', [UserController::class, 'updateStatus'])->name('api.admin.users.update-status');
-            Route::put('/users/{id}/password', [UserController::class, 'resetPassword'])->name('api.admin.users.reset-password');
-            Route::delete('/users/{id}', [UserController::class, 'destroy'])->name('api.admin.users.destroy');
-            Route::put('/admins/{id}/status', [UserController::class, 'updateAdminStatus'])->name('api.admin.admins.update-status');
+            Route::get('/users/{id}', [UserController::class, 'show'])->name('api.admin.users.show')->where('id', '[0-9]+');
+            Route::put('/users/{id}/status', [UserController::class, 'updateStatus'])->name('api.admin.users.update-status')->where('id', '[0-9]+');
+            Route::put('/users/{id}/password', [UserController::class, 'resetPassword'])->name('api.admin.users.reset-password')->where('id', '[0-9]+');
+            Route::delete('/users/{id}', [UserController::class, 'destroy'])->name('api.admin.users.destroy')->where('id', '[0-9]+');
+            Route::put('/admins/{id}/status', [UserController::class, 'updateAdminStatus'])->name('api.admin.admins.update-status')->where('id', '[0-9]+');
 
-            // User Data Export
-            Route::get('/users/export', [AdminController::class, 'exportUserData'])->name('api.admin.users.export');
 
             // Reviews Management
             Route::get('/reviews/pending', [AdminController::class, 'getPendingReviews'])->name('api.admin.reviews.pending');
-            Route::post('/reviews/{review}/moderate', [AdminController::class, 'moderateReview'])->name('api.admin.reviews.moderate');
+            Route::post('/reviews/{review}/moderate', [AdminController::class, 'moderateReview'])->name('api.admin.reviews.moderate')->where('review', '[0-9]+');
 
             // Doctor Verification
             Route::get('/doctors/pending', [DoctorVerificationController::class, 'pendingDoctors'])->name('api.admin.doctors.pending');
             Route::get('/documents/pending', [DoctorVerificationController::class, 'pendingDocuments'])->name('api.admin.documents.pending');
-            Route::get('/documents/{id}', [DoctorVerificationController::class, 'showDocument'])->name('api.admin.documents.show');
-            Route::post('/documents/{id}/approve', [DoctorVerificationController::class, 'approveDocument'])->name('api.admin.documents.approve');
-            Route::post('/documents/{id}/reject', [DoctorVerificationController::class, 'rejectDocument'])->name('api.admin.documents.reject');
-            Route::post('/doctors/{id}/verify', [DoctorVerificationController::class, 'verifyDoctor'])->name('api.admin.doctors.verify');
-            Route::post('/doctors/{id}/revoke', [DoctorVerificationController::class, 'revokeVerification'])->name('api.admin.doctors.revoke');
+            Route::get('/documents/{id}', [DoctorVerificationController::class, 'showDocument'])->name('api.admin.documents.show')->where('id', '[0-9]+');
+            Route::post('/documents/{id}/approve', [DoctorVerificationController::class, 'approveDocument'])->name('api.admin.documents.approve')->where('id', '[0-9]+');
+            Route::post('/documents/{id}/reject', [DoctorVerificationController::class, 'rejectDocument'])->name('api.admin.documents.reject')->where('id', '[0-9]+');
+            Route::post('/doctors/{id}/verify', [DoctorVerificationController::class, 'verifyDoctor'])->name('api.admin.doctors.verify')->where('id', '[0-9]+');
+            Route::post('/doctors/{id}/revoke', [DoctorVerificationController::class, 'revokeVerification'])->name('api.admin.doctors.revoke')->where('id', '[0-9]+');
 
             // Appointment Management
-            Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'markAsNoShow'])->name('api.admin.appointments.mark-no-show');
+            Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'markAsNoShow'])->name('api.admin.appointments.mark-no-show')->where('id', '[0-9]+');
 
             // Reports and Analytics
             Route::get('/reports/financial', [ReportController::class, 'financialStats'])->name('api.admin.reports.financial');

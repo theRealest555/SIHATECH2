@@ -20,12 +20,9 @@ class AuthenticatedSessionController extends Controller
             // Use the authenticate method from LoginRequest
             $request->authenticate();
 
-            // Regenerate session for security
-            $request->session()->regenerate();
-
             $user = $request->user();
 
-            // For API usage, also create a token
+            // Create a token for API usage
             $token = $user->createToken('auth-token', [$user->role])->plainTextToken;
 
             return response()->json([
@@ -63,17 +60,10 @@ class AuthenticatedSessionController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         try {
-            // Revoke current access token if using API tokens
+            // Revoke the current access token
             if ($request->user() && $request->user()->currentAccessToken()) {
                 $request->user()->currentAccessToken()->delete();
             }
-
-            // Logout from web guard
-            Auth::guard('web')->logout();
-
-            // Invalidate session
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
 
             return response()->json([
                 'message' => 'Logged out successfully'
