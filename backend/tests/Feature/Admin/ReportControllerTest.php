@@ -69,7 +69,12 @@ class ReportControllerTest extends TestCase
 
     public function test_admin_can_export_financial_report_as_csv()
     {
-        Payment::factory()->count(2)->create(['status' => 'completed', 'amount' => 150]);
+        // Ensure payments are created within the current month for the default date range
+        Payment::factory()->count(2)->create([
+            'status' => 'completed',
+            'amount' => 150,
+            'created_at' => now()->startOfMonth()->addDays(3) // Explicitly set created_at
+        ]);
 
         $response = $this->get('/api/admin/reports/export/financial?format=csv');
 
@@ -82,18 +87,18 @@ class ReportControllerTest extends TestCase
         echo $content;
         $csvOutput = ob_get_clean();
 
-        // Remove BOM if present for assertion
         if (strpos($csvOutput, "\xEF\xBB\xBF") === 0) {
             $csvOutput = substr($csvOutput, 3);
         }
         $csvOutput = trim($csvOutput);
 
         $lines = explode("\n", $csvOutput);
-        $actualHeader = rtrim($lines[0], "\r"); // Remove potential trailing carriage return
-        $expectedHeader = 'ID,Nom du patient,Email,Montant,"Méthode de paiement",Statut,"Date de paiement",Abonnement';
+        $actualHeader = rtrim($lines[0], "\r");
+        $expectedHeader = 'ID,"Nom du patient",Email,Montant,"Méthode de paiement",Statut,"Date de paiement",Abonnement';
 
         $this->assertEquals($expectedHeader, $actualHeader, "CSV header does not match.");
-        $this->assertStringContainsString('150', $csvOutput); // Check if amount is present in the body
+        // This assertion should now pass as payments with amount 150 are created for the current month
+        $this->assertStringContainsString('150', $csvOutput);
     }
 
     public function test_admin_export_financial_report_handles_unsupported_format()

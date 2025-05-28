@@ -29,7 +29,12 @@ class StatisticsControllerTest extends TestCase
 
         // Mock the service
         $this->statsServiceMock = Mockery::mock(DoctorStatisticsService::class);
-        $this->app->instance(DoctorStatisticsService::class, $this->statsServiceMock);
+        // Bind the mock to the service container.
+        $this->app->bind(DoctorStatisticsService::class, function ($app, $params) {
+            // This factory ensures our mock is returned when the controller resolves the service,
+            // even with constructor parameters.
+            return $this->statsServiceMock;
+        });
     }
 
     protected function tearDown(): void
@@ -49,18 +54,9 @@ class StatisticsControllerTest extends TestCase
             'trends' => ['appointments' => [['month' => 'Jan 2023', 'count' => 5]]]
         ];
 
-        // Ensure the mock is returned when the service is resolved with parameters
-        // This approach assumes the mock instance can handle being resolved this way.
-        // If the controller directly used constructor injection, this would be simpler.
-        $this->app->bind(DoctorStatisticsService::class, function ($app, $params) use ($mockStats) {
-            // This ensures that even if the app tries to make a new instance with params,
-            // our pre-configured mock is returned and its methods behave as expected.
-            $this->statsServiceMock->shouldReceive('getDashboardStats')->once()->andReturn($mockStats);
-            return $this->statsServiceMock;
-        });
+        $this->statsServiceMock->shouldReceive('getDashboardStats')->once()->andReturn($mockStats);
 
-
-        $response = $this->getJson('/api/doctor/stats'); //
+        $response = $this->getJson('/api/doctor/stats');
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
@@ -70,25 +66,18 @@ class StatisticsControllerTest extends TestCase
 
     public function test_doctor_can_get_appointment_statistics_by_period()
     {
-        // This test would ideally not mock DoctorStatisticsService to test the controller's
-        // logic for calling the service with period parameters.
-        // For this example, we will assume the service is correctly mocked or tested elsewhere.
-        // To fix PDOException, ensure transactions are handled cleanly in app/service code if any.
-        // For tests, RefreshDatabase should handle it unless there's an unhandled app exception.
-
-        // Minimal setup to avoid PDO issues if possible, focusing on controller's ability to call route
-        $this->statsServiceMock->shouldReceive('getDashboardStats')->andReturn([
-             'appointments' => ['period' => 'week', 'data' => [], 'summary' => ['total' => 0]] // Provide a basic structure
+        $this->statsServiceMock->shouldReceive('getDashboardStats')->once()->andReturn([
+             'appointments' => ['period' => 'week', 'data' => [], 'summary' => ['total' => 0]]
         ]);
 
 
-        $response = $this->getJson('/api/doctor/stats/appointments?period=week'); //
+        $response = $this->getJson('/api/doctor/stats/appointments?period=week');
 
         $response->assertStatus(200)
             ->assertJsonPath('status', 'success')
-            ->assertJsonStructure([ // Check structure rather than specific counts if PDO issues persist
+            ->assertJsonStructure([
                 'status',
-                'data' // 'data' => ['period', 'data', 'summary'] - The controller returns $allStats['appointments']
+                'data'
             ]);
     }
 
@@ -105,10 +94,9 @@ class StatisticsControllerTest extends TestCase
         ]);
 
 
-        $response = $this->get('/api/doctor/stats/export?type=overview&format=csv'); //
+        $response = $this->get('/api/doctor/stats/export?type=overview&format=csv');
 
         $response->assertStatus(200)
             ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        // Further assertions on CSV content can be done by inspecting $response->streamedContent()
     }
 }

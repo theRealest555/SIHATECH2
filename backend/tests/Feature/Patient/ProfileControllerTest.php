@@ -4,20 +4,21 @@ namespace Tests\Feature\Patient;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User; //
-use App\Models\Patient; //
-use App\Models\Doctor; //
+use App\Models\User;
+use App\Models\Patient;
+use App\Models\Doctor;
 use Laravel\Sanctum\Sanctum;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB; // Added for tearDown
 
 class ProfileControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $patientUser; //
-    protected Patient $patient; //
+    protected User $patientUser;
+    protected Patient $patient;
 
     protected function setUp(): void
     {
@@ -25,14 +26,24 @@ class ProfileControllerTest extends TestCase
         // Ensure Storage is faked for tests involving file uploads
         Storage::fake('public');
 
-        $this->patientUser = User::factory()->create(['role' => 'patient', 'email_verified_at' => now(), 'status' => 'actif']); //
-        $this->patient = Patient::factory()->create(['user_id' => $this->patientUser->id]); //
+        $this->patientUser = User::factory()->create(['role' => 'patient', 'email_verified_at' => now(), 'status' => 'actif']);
+        $this->patient = Patient::factory()->create(['user_id' => $this->patientUser->id]);
         Sanctum::actingAs($this->patientUser, ['role:patient']);
+    }
+
+    // Add this tearDown method to the class
+    protected function tearDown(): void
+    {
+        // Attempt to roll back any lingering transactions if they exist
+        while (DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
+        parent::tearDown();
     }
 
     public function test_patient_can_view_their_profile()
     {
-        $response = $this->getJson('/api/patient/profile'); //
+        $response = $this->getJson('/api/patient/profile');
 
         $response->assertStatus(200)
             ->assertJsonPath('user.id', $this->patientUser->id)
@@ -41,7 +52,7 @@ class ProfileControllerTest extends TestCase
 
     public function test_patient_can_update_their_profile()
     {
-        $doctor = Doctor::factory()->create(); //
+        $doctor = Doctor::factory()->create();
         $updateData = [
             'nom' => 'UpdatedLastName',
             'prenom' => 'UpdatedFirstName',
@@ -53,7 +64,7 @@ class ProfileControllerTest extends TestCase
             'medecin_favori_id' => $doctor->id,
         ];
 
-        $response = $this->putJson('/api/patient/profile', $updateData); //
+        $response = $this->putJson('/api/patient/profile', $updateData);
 
         $response->assertStatus(200)
             ->assertJsonPath('message', 'Profile updated successfully')
@@ -62,12 +73,12 @@ class ProfileControllerTest extends TestCase
             ->assertJsonPath('patient.medecin_favori_id', $doctor->id);
 
         $this->assertDatabaseHas('users', ['id' => $this->patientUser->id, 'nom' => 'UpdatedLastName', 'email' => 'updated.patient@example.com']);
-        $this->assertDatabaseHas('patients', ['user_id' => $this->patientUser->id, 'medecin_favori_id' => $doctor->id]); //
+        $this->assertDatabaseHas('patients', ['user_id' => $this->patientUser->id, 'medecin_favori_id' => $doctor->id]);
     }
 
     public function test_patient_cannot_update_profile_with_invalid_data()
     {
-        $response = $this->putJson('/api/patient/profile', ['email' => 'not-an-email']); //
+        $response = $this->putJson('/api/patient/profile', ['email' => 'not-an-email']);
 
         $response->assertStatus(422)
                  ->assertJsonValidationErrors(['email']);
@@ -84,7 +95,7 @@ class ProfileControllerTest extends TestCase
         // Ensure the user's current password is 'password'
         $this->patientUser->update(['password' => Hash::make('password')]);
 
-        $response = $this->putJson('/api/patient/profile/password', $passwordData); //
+        $response = $this->putJson('/api/patient/profile/password', $passwordData);
 
         $response->assertStatus(200)
             ->assertJsonPath('message', 'Password updated successfully');
@@ -102,7 +113,7 @@ class ProfileControllerTest extends TestCase
             'password' => 'newSecurePassword123',
             'password_confirmation' => 'newSecurePassword123',
         ];
-        $response = $this->putJson('/api/patient/profile/password', $passwordData); //
+        $response = $this->putJson('/api/patient/profile/password', $passwordData);
 
         $response->assertStatus(422)
                  ->assertJsonPath('message', 'The current password is incorrect.');
@@ -111,10 +122,9 @@ class ProfileControllerTest extends TestCase
 
     public function test_patient_can_update_profile_photo()
     {
-        // Storage::fake('public'); // Moved to setUp for all tests in this class
         $file = UploadedFile::fake()->image('avatar.jpg');
 
-        $response = $this->postJson('/api/patient/profile/photo', ['photo' => $file]); //
+        $response = $this->postJson('/api/patient/profile/photo', ['photo' => $file]);
 
         $response->assertStatus(200)
             ->assertJsonPath('message', 'Photo updated successfully')
@@ -122,16 +132,16 @@ class ProfileControllerTest extends TestCase
 
         $path = $response->json('path');
         $this->assertTrue(Storage::disk('public')->exists($path));
-        $this->assertDatabaseHas('users', ['id' => $this->patientUser->id, 'photo' => $path]); //
+        $this->assertDatabaseHas('users', ['id' => $this->patientUser->id, 'photo' => $path]);
     }
 
     public function test_doctor_cannot_access_patient_profile_routes()
     {
-        $doctorUser = User::factory()->create(['role' => 'medecin']); //
-        Doctor::factory()->create(['user_id' => $doctorUser->id]); //
+        $doctorUser = User::factory()->create(['role' => 'medecin']);
+        Doctor::factory()->create(['user_id' => $doctorUser->id]);
         Sanctum::actingAs($doctorUser, ['role:medecin']);
 
-        $response = $this->getJson('/api/patient/profile'); //
+        $response = $this->getJson('/api/patient/profile');
         $response->assertStatus(403); // Forbidden
     }
 }

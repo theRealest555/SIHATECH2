@@ -10,11 +10,7 @@ use App\Models\UserSubscription;
 use App\Services\StripePaymentService;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
-// It's generally better to mock your service rather than Stripe SDK statics directly
-// use Stripe\SetupIntent;
-// use Stripe\Customer;
-// use Stripe\Subscription as StripeSubscription;
-
+use Stripe\Customer as StripeCustomer; // Import Stripe Customer
 
 class SubscriptionControllerTest extends TestCase
 {
@@ -37,7 +33,6 @@ class SubscriptionControllerTest extends TestCase
             'stripe_price_id' => 'price_premium_123'
         ]);
 
-        // Mock Stripe service
         $this->stripeServiceMock = Mockery::mock(StripePaymentService::class);
         $this->app->instance(StripePaymentService::class, $this->stripeServiceMock);
     }
@@ -60,18 +55,27 @@ class SubscriptionControllerTest extends TestCase
 
     public function test_can_get_stripe_setup_intent()
     {
-        // Mock the Stripe\Customer object
-        $mockStripeCustomer = Mockery::mock('Stripe\Customer');
-        $mockStripeCustomer->id = 'cus_123'; // Set the id property on the mock
+        // Mock a Stripe\Customer object
+        // It's important that this mock behaves like a Stripe\Customer object,
+        // especially for accessing properties like 'id'.
+        $mockStripeCustomer = Mockery::mock(StripeCustomer::class);
+        // Mockery allows dynamic properties on mocks, or you can define them if needed
+        // For Stripe objects, direct property access often goes through __get,
+        // so setting it dynamically or ensuring the mock responds to 'id' is key.
+        // A simple way if only 'id' is accessed:
+        $mockStripeCustomer->id = 'cus_test_123';
+
 
         $this->stripeServiceMock
             ->shouldReceive('getOrCreateCustomer')
+            ->once()
             ->with($this->user)
-            ->andReturn($mockStripeCustomer); // Return the mocked Stripe\Customer object
+            ->andReturn($mockStripeCustomer); // Return the mocked Stripe\Customer
 
         $this->stripeServiceMock
             ->shouldReceive('createStripeSetupIntent')
-            ->with('cus_123')
+            ->once()
+            ->with('cus_test_123') // Ensure this matches the mocked customer's ID
             ->andReturn((object)['client_secret' => 'seti_123_secret_456']);
 
 
@@ -80,7 +84,7 @@ class SubscriptionControllerTest extends TestCase
         $response->assertStatus(200)
                  ->assertJsonPath('status', 'success')
                  ->assertJsonPath('client_secret', 'seti_123_secret_456')
-                 ->assertJsonPath('customer_id', 'cus_123');
+                 ->assertJsonPath('customer_id', 'cus_test_123');
     }
 
 
@@ -88,7 +92,6 @@ class SubscriptionControllerTest extends TestCase
     {
         $paymentMethodId = 'pm_card_visa';
 
-        // Mock the service's processPayment method
         $this->stripeServiceMock
             ->shouldReceive('processPayment')
             ->once()
@@ -100,7 +103,7 @@ class SubscriptionControllerTest extends TestCase
             ->andReturn([
                 'success' => true,
                 'payment' => (object)['id' => 1, 'status' => 'completed'],
-                'subscription' => (object)['id' => 'sub_123'],
+                'subscription' => (object)['id' => 'sub_123'], // Stripe Subscription object mock
                 'client_secret' => 'pi_123_secret_456'
             ]);
 
