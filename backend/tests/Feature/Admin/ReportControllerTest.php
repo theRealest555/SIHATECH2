@@ -6,12 +6,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Admin;
-use App\Models\Payment;
+use App\Models\Avis;
 use App\Models\Rendezvous;
+use App\Models\Payment;
 use App\Models\Doctor;
+use App\Models\Patient; // Added Patient
 use App\Models\Speciality;
 use Laravel\Sanctum\Sanctum;
-use Carbon\Carbon;
+use Carbon\Carbon; // Added Carbon
 
 class ReportControllerTest extends TestCase
 {
@@ -23,16 +25,34 @@ class ReportControllerTest extends TestCase
     {
         parent::setUp();
         $this->adminUser = User::factory()->create(['role' => 'admin', 'status' => 'actif']);
-        Admin::factory()->active()->create(['user_id' => $this->adminUser->id]);
+        // Ensure the admin user has an admin profile and it's active
+        if (!$this->adminUser->admin()->exists()) {
+            Admin::factory()->active()->create(['user_id' => $this->adminUser->id]);
+        } else {
+            $this->adminUser->admin->update(['admin_status' => 1]);
+        }
+        $this->adminUser->refresh();
         Sanctum::actingAs($this->adminUser, ['role:admin']);
     }
 
-    public function test_admin_can_fetch_financial_stats()
+    public function test_admin_can_fetch_financial_stats(): void
     {
-        Payment::factory()->count(5)->create(['status' => 'completed', 'amount' => 100, 'created_at' => now()]);
-        Payment::factory()->count(2)->create(['status' => 'completed', 'amount' => 50, 'created_at' => now()->subMonths(2)]);
+        // Ensure payments are created within the current month
+        Payment::factory()->count(5)->create([
+            'status' => 'completed',
+            'amount' => 100,
+            'created_at' => Carbon::now()->startOfMonth()->addDays(2) // Explicitly set created_at
+        ]);
+        Payment::factory()->count(2)->create([
+            'status' => 'completed',
+            'amount' => 50,
+            'created_at' => Carbon::now()->subMonths(2)
+        ]);
 
-        $response = $this->getJson('/api/admin/reports/financial?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString());
+        $startDate = Carbon::now()->startOfMonth()->toDateString();
+        $endDate = Carbon::now()->endOfMonth()->toDateString();
+
+        $response = $this->getJson("/api/admin/reports/financial?start_date={$startDate}&end_date={$endDate}");
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => [
@@ -46,13 +66,32 @@ class ReportControllerTest extends TestCase
             ->assertJsonPath('data.total_revenue', 5 * 100); // 500
     }
 
-    public function test_admin_can_fetch_rendezvous_stats()
+    public function test_admin_can_fetch_rendezvous_stats(): void
     {
-        $doctor = Doctor::factory()->create();
-        Rendezvous::factory()->count(3)->create(['doctor_id' => $doctor->id, 'statut' => 'terminé', 'created_at' => now()]);
-        Rendezvous::factory()->count(2)->create(['doctor_id' => $doctor->id, 'statut' => 'annulé', 'created_at' => now()]);
+        $doctorUser = User::factory()->create(['role' => 'medecin']); // Create a user for the doctor
+        $doctor = Doctor::factory()->create(['user_id' => $doctorUser->id]); // Create doctor linked to user
 
-        $response = $this->getJson('/api/admin/reports/appointments?start_date=' . now()->startOfMonth()->toDateString() . '&end_date=' . now()->endOfMonth()->toDateString());
+        $patientUser = User::factory()->create(['role' => 'patient']); // Create a user for the patient
+        Patient::factory()->create(['user_id' => $patientUser->id]); // Create patient linked to user
+
+
+        Rendezvous::factory()->count(3)->create([
+            'doctor_id' => $doctor->id,
+            'patient_id' => $patientUser->patient->id, // Use the patient's profile ID
+            'statut' => 'terminé',
+            'created_at' => Carbon::now()->startOfMonth()->addDays(1) // Explicitly set created_at
+        ]);
+        Rendezvous::factory()->count(2)->create([
+            'doctor_id' => $doctor->id,
+            'patient_id' => $patientUser->patient->id, // Use the patient's profile ID
+            'statut' => 'annulé',
+            'created_at' => Carbon::now()->startOfMonth()->addDays(2) // Explicitly set created_at
+        ]);
+
+        $startDate = Carbon::now()->startOfMonth()->toDateString();
+        $endDate = Carbon::now()->endOfMonth()->toDateString();
+
+        $response = $this->getJson("/api/admin/reports/appointments?start_date={$startDate}&end_date={$endDate}");
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => [
@@ -67,16 +106,19 @@ class ReportControllerTest extends TestCase
             ->assertJsonPath('data.cancelled_rendezvouss', 2);
     }
 
-    public function test_admin_can_export_financial_report_as_csv()
+    public function test_admin_can_export_financial_report_as_csv(): void
     {
-        // Ensure payments are created within the current month for the default date range
         Payment::factory()->count(2)->create([
             'status' => 'completed',
             'amount' => 150,
-            'created_at' => now()->startOfMonth()->addDays(3) // Explicitly set created_at
+            'created_at' => Carbon::now()->startOfMonth()->addDays(3)
         ]);
 
-        $response = $this->get('/api/admin/reports/export/financial?format=csv');
+        $startDate = Carbon::now()->startOfMonth()->toDateString();
+        $endDate = Carbon::now()->endOfMonth()->toDateString();
+
+
+        $response = $this->get("/api/admin/reports/export/financial?format=csv&start_date={$startDate}&end_date={$endDate}");
 
         $response->assertStatus(200)
             ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
@@ -84,7 +126,7 @@ class ReportControllerTest extends TestCase
 
         $content = $response->streamedContent();
         ob_start();
-        echo $content;
+        echo $content; // Changed from $content()
         $csvOutput = ob_get_clean();
 
         if (strpos($csvOutput, "\xEF\xBB\xBF") === 0) {
@@ -93,15 +135,15 @@ class ReportControllerTest extends TestCase
         $csvOutput = trim($csvOutput);
 
         $lines = explode("\n", $csvOutput);
-        $actualHeader = rtrim($lines[0], "\r");
+        $actualHeader = rtrim($lines[0], "\r"); // Remove potential trailing CR
+        // Make sure the expected header exactly matches what FinancialReportExport generates
         $expectedHeader = 'ID,"Nom du patient",Email,Montant,"Méthode de paiement",Statut,"Date de paiement",Abonnement';
 
         $this->assertEquals($expectedHeader, $actualHeader, "CSV header does not match.");
-        // This assertion should now pass as payments with amount 150 are created for the current month
         $this->assertStringContainsString('150', $csvOutput);
     }
 
-    public function test_admin_export_financial_report_handles_unsupported_format()
+    public function test_admin_export_financial_report_handles_unsupported_format(): void
     {
         $response = $this->getJson('/api/admin/reports/export/financial?format=xlsx');
         $response->assertStatus(501)
