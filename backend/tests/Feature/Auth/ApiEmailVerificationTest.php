@@ -43,6 +43,20 @@ class ApiEmailVerificationTest extends TestCase
         $response->assertRedirect($expectedRedirect);
     }
 
+    public function test_email_verification_error_route_redirects_correctly(): void
+    {
+        // Act: Make a GET request to the verification error route
+        // This route is defined in routes/api.php
+        $response = $this->getJson('/api/email/verify/error');
+
+        // Assert: Check that the response is a redirect to the URL defined in config/verification.php
+        // The config('verification.redirect.error') should point to your frontend's error page for this.
+        // Example: env('FRONTEND_URL', 'http://localhost:3000') . '/email/verify/error'
+        $expectedErrorRedirectUrl = config('verification.redirect.error');
+
+        $response->assertRedirect($expectedErrorRedirectUrl);
+    }
+
     public function test_email_is_not_verified_with_invalid_hash_via_api(): void
     {
         $user = User::factory()->create(['email_verified_at' => null]);
