@@ -2,15 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from '../../api/axios';
 import { API_URLS } from '../../constants/apiUrls';
 
-/**
- * Fetch all doctors
- * Matches backend route: GET /api/doctors
- */
+// Fetch all doctors (Public)
 export const fetchAllDoctors = createAsyncThunk(
   'doctor/fetchAll',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.LIST);
+      const response = await axios.get(API_URLS.DOCTORS.LIST); // Corrected URL used here
       return response.data.data || [];
     } catch (error) {
       return rejectWithValue({
@@ -20,16 +17,14 @@ export const fetchAllDoctors = createAsyncThunk(
   }
 );
 
-/**
- * Fetch doctor specialities
- * Matches backend route: GET /api/doctors/specialities
- */
+// Fetch doctor specialities (Public)
 export const fetchDoctorSpecialities = createAsyncThunk(
   'doctor/fetchSpecialities',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.SPECIALITIES);
-      return response.data.data || [];
+      const response = await axios.get(API_URLS.DOCTORS.SPECIALITIES); // Corrected URL
+      // Backend returns: { data: [{id, nom, description}, ...] }
+      return response.data.data || []; 
     } catch (error) {
       return rejectWithValue({
         message: error.response?.data?.message || 'Failed to fetch specialities'
@@ -38,15 +33,13 @@ export const fetchDoctorSpecialities = createAsyncThunk(
   }
 );
 
-/**
- * Fetch doctor locations
- * Matches backend route: GET /api/doctors/locations
- */
+// Fetch doctor locations (Public)
 export const fetchDoctorLocations = createAsyncThunk(
   'doctor/fetchLocations',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.LOCATIONS);
+      const response = await axios.get(API_URLS.DOCTORS.LOCATIONS); // Corrected URL
+      // Backend returns { data: ["Location1", "Location2", ...] }
       return response.data.data || [];
     } catch (error) {
       return rejectWithValue({
@@ -56,16 +49,13 @@ export const fetchDoctorLocations = createAsyncThunk(
   }
 );
 
-/**
- * Search for doctors
- * Matches backend route: GET /api/doctors/search
- */
+// Search for doctors (Public)
 export const searchDoctors = createAsyncThunk(
   'doctor/search',
   async (filters, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.SEARCH, { params: filters });
-      return response.data.data || [];
+      const response = await axios.get(API_URLS.DOCTORS.SEARCH, { params: filters }); // Corrected URL
+      return response.data.data || []; // Backend response structure { data: [], meta: {}, links: {} }
     } catch (error) {
       return rejectWithValue({
         message: error.response?.data?.message || 'Failed to search doctors'
@@ -74,16 +64,21 @@ export const searchDoctors = createAsyncThunk(
   }
 );
 
-/**
- * Fetch doctor availability
- * Matches backend route: GET /api/doctors/{doctorId}/availability
- */
+// Fetch doctor availability (Public or Authenticated Doctor for their own)
 export const fetchDoctorAvailability = createAsyncThunk(
   'doctor/fetchAvailability',
-  async (doctorId, { rejectWithValue }) => {
+  async (doctorId, { getState, rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.AVAILABILITY(doctorId));
-      // The backend returns data in the format: { status: 'success', data: { schedule: {}, leaves: [] } }
+      const { auth } = getState();
+      let endpoint;
+      if (auth.user?.role === 'medecin' && auth.user.doctor?.id === doctorId) {
+        // Authenticated doctor fetching their own availability
+        endpoint = API_URLS.DOCTOR.SCHEDULE; // Uses /api/doctor/availability (maps to AvailabilityController@getAvailability)
+      } else {
+        // Public fetch or patient fetching specific doctor
+        endpoint = API_URLS.DOCTORS.AVAILABILITY(doctorId); // Uses /api/public/doctors/{doctorId}/availability
+      }
+      const response = await axios.get(endpoint);
       return response.data.data || { schedule: {}, leaves: [] };
     } catch (error) {
       return rejectWithValue({
@@ -93,16 +88,13 @@ export const fetchDoctorAvailability = createAsyncThunk(
   }
 );
 
-/**
- * Fetch doctor available slots
- * Matches backend route: GET /api/doctors/{doctorId}/slots
- */
+// Fetch doctor available slots (Public or Authenticated Doctor for their own)
 export const fetchDoctorSlots = createAsyncThunk(
   'doctor/fetchSlots',
   async ({ doctorId, date }, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URLS.DOCTORS.SLOTS(doctorId), { params: { date } });
-      // The backend returns data in the format: { status: 'success', data: ['09:00', '09:30', ...], meta: {} }
+      // This is a public endpoint, anyone can check slots
+      const response = await axios.get(API_URLS.DOCTORS.SLOTS(doctorId), { params: { date } }); // Corrected URL
       return { doctorId, date, slots: response.data.data || [] };
     } catch (error) {
       return rejectWithValue({
@@ -112,15 +104,13 @@ export const fetchDoctorSlots = createAsyncThunk(
   }
 );
 
-/**
- * Update doctor schedule
- * Matches backend route: POST /api/doctor/schedule
- */
+// Update doctor schedule (Authenticated Doctor)
 export const updateDoctorSchedule = createAsyncThunk(
   'doctor/updateSchedule',
-  async ({ schedule }, { rejectWithValue }) => {
+  async ({ schedule }, { rejectWithValue }) => { // doctorId removed, backend gets it from auth
     try {
-      const response = await axios.post(API_URLS.DOCTOR.SCHEDULE, { schedule });
+      // Uses API_URLS.DOCTOR.SCHEDULE -> /api/doctor/schedule (AvailabilityController@updateSchedule)
+      const response = await axios.put(API_URLS.DOCTOR.SCHEDULE, { schedule }); // Changed to PUT
       return response.data.data || {};
     } catch (error) {
       return rejectWithValue({
@@ -131,14 +121,12 @@ export const updateDoctorSchedule = createAsyncThunk(
   }
 );
 
-/**
- * Create doctor leave
- * Matches backend route: POST /api/doctor/leaves
- */
+// Create doctor leave (Authenticated Doctor)
 export const createDoctorLeave = createAsyncThunk(
   'doctor/createLeave',
-  async ({ leaveData }, { rejectWithValue }) => {
+  async ({ leaveData }, { rejectWithValue }) => { // doctorId removed, backend gets it from auth
     try {
+      // Uses API_URLS.DOCTOR.LEAVES -> /api/doctor/leaves (AvailabilityController@createLeave)
       const response = await axios.post(API_URLS.DOCTOR.LEAVES, leaveData);
       return response.data.data || {};
     } catch (error) {
@@ -150,14 +138,12 @@ export const createDoctorLeave = createAsyncThunk(
   }
 );
 
-/**
- * Delete doctor leave
- * Matches backend route: DELETE /api/doctor/leaves/{leaveId}
- */
+// Delete doctor leave (Authenticated Doctor)
 export const deleteDoctorLeave = createAsyncThunk(
   'doctor/deleteLeave',
-  async ({ leaveId }, { rejectWithValue }) => {
+  async ({ leaveId }, { rejectWithValue }) => { // doctorId removed, backend gets it from auth after checking ownership
     try {
+      // Uses API_URLS.DOCTOR.LEAVE(leaveId) -> /api/doctor/leaves/{leaveId} (AvailabilityController@deleteLeave)
       await axios.delete(API_URLS.DOCTOR.LEAVE(leaveId));
       return { leaveId };
     } catch (error) {
@@ -168,10 +154,7 @@ export const deleteDoctorLeave = createAsyncThunk(
   }
 );
 
-/**
- * Upload doctor document
- * Matches backend route: POST /api/doctor/documents
- */
+// Upload doctor document (Authenticated Doctor)
 export const uploadDoctorDocument = createAsyncThunk(
   'doctor/uploadDocument',
   async ({ file, type }, { rejectWithValue }) => {
@@ -195,10 +178,7 @@ export const uploadDoctorDocument = createAsyncThunk(
   }
 );
 
-/**
- * Fetch doctor documents
- * Matches backend route: GET /api/doctor/documents
- */
+// Fetch doctor documents (Authenticated Doctor)
 export const fetchDoctorDocuments = createAsyncThunk(
   'doctor/fetchDocuments',
   async (_, { rejectWithValue }) => {
@@ -213,16 +193,13 @@ export const fetchDoctorDocuments = createAsyncThunk(
   }
 );
 
-/**
- * Complete doctor profile (after social registration)
- * Matches backend route: POST /api/doctor/complete-profile
- */
+// Complete doctor profile (after social registration - Authenticated Doctor)
 export const completeDoctorProfile = createAsyncThunk(
   'doctor/completeProfile',
   async (profileData, { rejectWithValue }) => {
     try {
       const response = await axios.post(API_URLS.DOCTOR.COMPLETE_PROFILE, profileData);
-      return response.data;
+      return response.data; // Contains { message, user (with updated doctor info) }
     } catch (error) {
       return rejectWithValue({
         message: error.response?.data?.message || 'Failed to complete profile',
@@ -233,14 +210,14 @@ export const completeDoctorProfile = createAsyncThunk(
 );
 
 const initialState = {
-  doctors: [],
-  specialities: [],
-  locations: [],
-  searchResults: [],
-  availability: { schedule: {}, leaves: [] },
-  slots: {},
-  documents: [],
-  status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
+  doctors: [], // For list of all doctors (public)
+  specialities: [], // Array of {id, nom, description}
+  locations: [], // Array of strings
+  searchResults: [], // For search results (public)
+  availability: { schedule: {}, leaves: [] }, // For a specific doctor (public or self)
+  slots: {}, // For a specific doctor and date { doctorId: { date: [slots] } } (public or self)
+  documents: [], // For authenticated doctor's documents
+  status: 'idle', 
   error: null,
 };
 
@@ -249,9 +226,12 @@ const doctorSlice = createSlice({
   initialState,
   reducers: {
     clearDoctorData: (state) => {
+      // Reset parts of the state as needed, e.g., on logout or page change
       state.doctors = [];
       state.searchResults = [];
+      state.availability = { schedule: {}, leaves: [] };
       state.slots = {};
+      // Keep specialities and locations as they are general data
       state.status = 'idle';
       state.error = null;
     },
@@ -269,41 +249,38 @@ const doctorSlice = createSlice({
       })
       .addCase(fetchAllDoctors.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch doctors';
+        state.error = action.payload?.message;
       })
       
       // Fetch specialities
       .addCase(fetchDoctorSpecialities.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(fetchDoctorSpecialities.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.specialities = action.payload;
+        state.specialities = action.payload; // Expecting array of {id, nom, ...}
       })
       .addCase(fetchDoctorSpecialities.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch specialities';
+        state.error = action.payload?.message;
       })
       
       // Fetch locations
       .addCase(fetchDoctorLocations.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(fetchDoctorLocations.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.locations = action.payload;
+        state.locations = action.payload; // Expecting array of strings
       })
       .addCase(fetchDoctorLocations.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch locations';
+        state.error = action.payload?.message;
       })
       
       // Search doctors
       .addCase(searchDoctors.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(searchDoctors.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -311,13 +288,12 @@ const doctorSlice = createSlice({
       })
       .addCase(searchDoctors.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to search doctors';
+        state.error = action.payload?.message;
       })
       
       // Fetch availability
       .addCase(fetchDoctorAvailability.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(fetchDoctorAvailability.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -325,17 +301,15 @@ const doctorSlice = createSlice({
       })
       .addCase(fetchDoctorAvailability.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch availability';
+        state.error = action.payload?.message;
       })
       
       // Fetch slots
       .addCase(fetchDoctorSlots.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(fetchDoctorSlots.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        // Store slots by doctorId and date
         if (!state.slots[action.payload.doctorId]) {
           state.slots[action.payload.doctorId] = {};
         }
@@ -343,13 +317,12 @@ const doctorSlice = createSlice({
       })
       .addCase(fetchDoctorSlots.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch slots';
+        state.error = action.payload?.message;
       })
       
       // Update schedule
       .addCase(updateDoctorSchedule.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(updateDoctorSchedule.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -357,27 +330,29 @@ const doctorSlice = createSlice({
       })
       .addCase(updateDoctorSchedule.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to update schedule';
+        state.error = action.payload?.message;
       })
       
       // Create leave
       .addCase(createDoctorLeave.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(createDoctorLeave.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.availability.leaves.push(action.payload);
+        if (state.availability.leaves) {
+            state.availability.leaves.push(action.payload);
+        } else {
+            state.availability.leaves = [action.payload];
+        }
       })
       .addCase(createDoctorLeave.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to create leave';
+        state.error = action.payload?.message;
       })
       
       // Delete leave
       .addCase(deleteDoctorLeave.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(deleteDoctorLeave.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -387,13 +362,12 @@ const doctorSlice = createSlice({
       })
       .addCase(deleteDoctorLeave.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to delete leave';
+        state.error = action.payload?.message;
       })
       
       // Upload document
       .addCase(uploadDoctorDocument.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(uploadDoctorDocument.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -401,13 +375,12 @@ const doctorSlice = createSlice({
       })
       .addCase(uploadDoctorDocument.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to upload document';
+        state.error = action.payload?.message;
       })
       
       // Fetch documents
       .addCase(fetchDoctorDocuments.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
       .addCase(fetchDoctorDocuments.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -415,20 +388,21 @@ const doctorSlice = createSlice({
       })
       .addCase(fetchDoctorDocuments.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to fetch documents';
+        state.error = action.payload?.message;
       })
       
       // Complete profile
       .addCase(completeDoctorProfile.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
       })
-      .addCase(completeDoctorProfile.fulfilled, (state) => {
+      .addCase(completeDoctorProfile.fulfilled, (state) => { // action.payload contains {message, user (with updated doctor)}
         state.status = 'succeeded';
+        // The userSlice should ideally handle updating the main user profile
+        // For now, we can assume it's handled or user will re-fetch profile.
       })
       .addCase(completeDoctorProfile.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to complete profile';
+        state.error = action.payload?.message;
       });
   },
 });

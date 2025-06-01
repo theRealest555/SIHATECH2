@@ -16,15 +16,14 @@ export const API_URLS = {
   
   // Doctor public endpoints (for searching/listing)
   DOCTORS: {
-    LIST: '/api/doctors',
-    SPECIALITIES: '/api/doctors/specialities',
-    LOCATIONS: '/api/doctors/locations',
-    SEARCH: '/api/doctors/search',
-    AVAILABILITY: (doctorId) => `/api/doctors/${doctorId}/availability`,
-    SLOTS: (doctorId) => `/api/doctors/${doctorId}/slots`,
+    LIST: '/api/public/doctors', // Corrected
+    SPECIALITIES: '/api/public/specialities', // Corrected
+    LOCATIONS: '/api/public/locations', // Corrected
+    SEARCH: '/api/public/doctors/search', // Corrected
+    AVAILABILITY: (doctorId) => `/api/public/doctors/${doctorId}/availability`, // Corrected
+    SLOTS: (doctorId) => `/api/public/doctors/${doctorId}/slots`, // Corrected
   },
   
-  // Doctor authenticated endpoints (for logged-in doctor)
   DOCTOR: {
     PROFILE: '/api/doctor/profile',
     UPDATE_PROFILE: '/api/doctor/profile',
@@ -49,7 +48,7 @@ export const API_URLS = {
   // Appointment endpoints
   APPOINTMENTS: {
     LIST: '/api/appointments',
-    BOOK: '/api/appointments',
+    BOOK: (doctorId) => `/api/patient/doctors/${doctorId}/appointments`, 
     UPDATE_STATUS: (id) => `/api/appointments/${id}/status`,
   },
   
@@ -67,6 +66,7 @@ export const API_URLS = {
     REJECT_DOCUMENT: (id) => `/api/admin/documents/${id}/reject`,
     VERIFY_DOCTOR: (id) => `/api/admin/doctors/${id}/verify`,
     REVOKE_VERIFICATION: (id) => `/api/admin/doctors/${id}/revoke`,
+    // Add other admin URLs as implemented and needed
   }
 };
 

@@ -1,78 +1,111 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import axios from 'axios';
-import ApiService from '../../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  fetchDoctorSpecialities, 
+  selectDoctorSpecialities, 
+  selectDoctorStatus,
+  completeDoctorProfile // Thunk to complete profile
+} from '../../redux/slices/doctorSlice';
+import { selectCurrentUser, selectAuthStatus, selectAuthError, checkAuth } from '../../redux/slices/authSlice'; // For user info
+import { toast } from 'react-toastify';
 
 const DoctorCompleteProfile = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Selectors
+  const currentUser = useSelector(selectCurrentUser);
+  const specialities = useSelector(selectDoctorSpecialities); // Expects array of {id, nom, ...}
+  const doctorOpStatus = useSelector(selectDoctorStatus); // For doctor slice operations like completeProfile
+  const authOpStatus = useSelector(selectAuthStatus); // For auth slice operations
+  const authErr = useSelector(selectAuthError);
+
+  // Local state
   const [formData, setFormData] = useState({
     speciality_id: '',
-    telephone: '',
-    adresse: '',
-    sexe: '',
-    date_de_naissance: '',
+    telephone: currentUser?.telephone || '', // Pre-fill if available
+    adresse: currentUser?.adresse || '',
+    sexe: currentUser?.sexe || '',
+    date_de_naissance: currentUser?.date_de_naissance || '',
   });
-  const [specialities, setSpecialities] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({}); // For validation errors
 
+  // Fetch specialities on mount
   useEffect(() => {
-    // Check if user is authenticated and is a doctor
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!user || user.role !== 'medecin') {
-      navigate('/login');
-      return;
-    }
+    dispatch(fetchDoctorSpecialities());
+  }, [dispatch]);
 
-    // Fetch specialities
-    const fetchSpecialities = async () => {
-      try {
-        const response = await ApiService.getSpecialities();
-        const specs = response.data.data.map((name, index) => ({
-          id: index + 1,
-          nom: name
-        }));
-        setSpecialities(specs);
-      } catch (err) {
-        console.error('Failed to fetch specialities:', err);
-        setError('Failed to load specialities');
-      }
-    };
-    fetchSpecialities();
-  }, [navigate]);
+  // Pre-fill form if currentUser data updates (e.g., after social auth)
+  useEffect(() => {
+    if (currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        telephone: currentUser.telephone || prev.telephone,
+        adresse: currentUser.adresse || prev.adresse,
+        sexe: currentUser.sexe || prev.sexe,
+        date_de_naissance: currentUser.date_de_naissance || prev.date_de_naissance,
+      }));
+    }
+  }, [currentUser]);
+
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: null }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    setErrors({}); // Clear previous errors
 
-    try {
-      const response = await axios.post('http://localhost:8000/api/doctor/complete-profile', formData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-
-      if (response.data.user) {
-        // Update user in localStorage
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      if (err.response?.data?.errors) {
-        const errors = err.response.data.errors;
-        const errorMessages = Object.values(errors).flat().join(' ');
-        setError(errorMessages);
-      } else {
-        setError(err.response?.data?.message || 'Failed to complete profile');
-      }
-    } finally {
-      setLoading(false);
+    // Basic client-side validation
+    if (!formData.speciality_id) {
+      setErrors(prev => ({...prev, speciality_id: 'Speciality is required.'}));
+      toast.error('Please select your medical speciality.');
+      return;
     }
+    // Add more client-side checks if needed, though backend will also validate
+
+    dispatch(completeDoctorProfile(formData))
+      .unwrap()
+      .then((response) => { // Backend returns { message, user (with updated doctor info) }
+        toast.success(response.message || 'Profile completed successfully!');
+        // Optionally update local auth state if backend returns full user object
+        // For now, just refetch auth state to ensure user object is up-to-date
+        dispatch(checkAuth()); 
+        navigate('/dashboard');
+      })
+      .catch((error) => {
+        if (error.errors) {
+          setErrors(error.errors);
+          const firstErrorKey = Object.keys(error.errors)[0];
+          toast.error(error.errors[firstErrorKey][0] || 'Failed to complete profile. Please check the form.');
+        } else {
+          toast.error(error.message || 'An unexpected error occurred.');
+        }
+      });
   };
+  
+  const isLoading = doctorOpStatus === 'loading' || authOpStatus === 'loading';
+  const isLoadingSpecialities = doctorOpStatus === 'loading' && specialities.length === 0;
+
+
+  // Redirect if not a doctor or profile seems complete (basic check)
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'medecin') {
+      navigate('/dashboard'); // Or to login if not authenticated
+    }
+    // More robust check: if doctor profile exists and has speciality_id, redirect
+    if (currentUser?.doctor?.speciality_id) {
+      // navigate('/dashboard'); // Commented out to allow re-completion if needed, or make this check stricter
+    }
+  }, [currentUser, navigate]);
+
 
   return (
     <div className="auth-container">
@@ -84,17 +117,24 @@ const DoctorCompleteProfile = () => {
                 <div className="text-center mb-4">
                   <i className="fas fa-user-md fa-3x text-primary mb-3"></i>
                   <h2 className="auth-header">Complete Your Profile</h2>
-                  <p className="text-muted">Please provide your professional information to continue</p>
+                  <p className="text-muted">Please provide your professional information to continue.</p>
                 </div>
 
-                {error && (
+                {authErr && ( // Display general auth error
                   <Alert variant="danger" className="fade-in">
                     <i className="fas fa-exclamation-triangle me-2"></i>
-                    {error}
+                    {typeof authErr === 'string' ? authErr : 'An error occurred.'}
+                  </Alert>
+                )}
+                {errors.general && ( // Display general form error from backend
+                  <Alert variant="danger" className="fade-in">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    {errors.general}
                   </Alert>
                 )}
 
-                <Form onSubmit={handleSubmit}>
+
+                <Form onSubmit={handleSubmit} noValidate>
                   <div className="bg-light p-4 rounded mb-4">
                     <h5 className="text-primary mb-3">
                       <i className="fas fa-stethoscope me-2"></i>
@@ -102,24 +142,22 @@ const DoctorCompleteProfile = () => {
                     </h5>
                     
                     <Form.Group className="mb-3">
-                      <Form.Label>
-                        <i className="fas fa-graduation-cap me-2"></i>
-                        Medical Speciality *
-                      </Form.Label>
+                      <Form.Label>Medical Speciality *</Form.Label>
                       <Form.Select
                         name="speciality_id"
                         value={formData.speciality_id}
                         onChange={handleChange}
-                        required
-                        disabled={loading}
+                        isInvalid={!!errors.speciality_id}
+                        disabled={isLoading || isLoadingSpecialities}
                       >
-                        <option value="">Select your speciality...</option>
-                        {specialities.map((spec) => (
+                        <option value="">{isLoadingSpecialities ? "Loading specialities..." : "Select your speciality..."}</option>
+                        {Array.isArray(specialities) && specialities.map((spec) => (
                           <option key={spec.id} value={spec.id}>
                             {spec.nom}
                           </option>
                         ))}
                       </Form.Select>
+                      <Form.Control.Feedback type="invalid">{errors.speciality_id}</Form.Control.Feedback>
                     </Form.Group>
                   </div>
 
@@ -129,26 +167,21 @@ const DoctorCompleteProfile = () => {
                   </h5>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-phone me-2"></i>
-                      Phone Number *
-                    </Form.Label>
+                    <Form.Label>Phone Number</Form.Label>
                     <Form.Control
                       type="tel"
                       name="telephone"
                       value={formData.telephone}
                       onChange={handleChange}
                       placeholder="Enter your phone number"
-                      required
-                      disabled={loading}
+                      isInvalid={!!errors.telephone}
+                      disabled={isLoading}
                     />
+                    <Form.Control.Feedback type="invalid">{errors.telephone}</Form.Control.Feedback>
                   </Form.Group>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-map-marker-alt me-2"></i>
-                      Practice Address *
-                    </Form.Label>
+                    <Form.Label>Practice Address</Form.Label>
                     <Form.Control
                       as="textarea"
                       rows={2}
@@ -156,44 +189,43 @@ const DoctorCompleteProfile = () => {
                       value={formData.adresse}
                       onChange={handleChange}
                       placeholder="Enter your practice address"
-                      required
-                      disabled={loading}
+                      isInvalid={!!errors.adresse}
+                      disabled={isLoading}
                     />
+                    <Form.Control.Feedback type="invalid">{errors.adresse}</Form.Control.Feedback>
                   </Form.Group>
 
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-venus-mars me-2"></i>
-                          Gender
-                        </Form.Label>
+                        <Form.Label>Gender</Form.Label>
                         <Form.Select
                           name="sexe"
                           value={formData.sexe}
                           onChange={handleChange}
-                          disabled={loading}
+                          isInvalid={!!errors.sexe}
+                          disabled={isLoading}
                         >
                           <option value="">Select...</option>
                           <option value="homme">Male</option>
                           <option value="femme">Female</option>
                         </Form.Select>
+                        <Form.Control.Feedback type="invalid">{errors.sexe}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-calendar me-2"></i>
-                          Date of Birth
-                        </Form.Label>
+                        <Form.Label>Date of Birth</Form.Label>
                         <Form.Control
                           type="date"
                           name="date_de_naissance"
                           value={formData.date_de_naissance}
                           onChange={handleChange}
-                          disabled={loading}
-                          max={new Date().toISOString().split('T')[0]}
+                          isInvalid={!!errors.date_de_naissance}
+                          disabled={isLoading}
+                          max={new Date().toISOString().split('T')[0]} // Prevent future dates
                         />
+                        <Form.Control.Feedback type="invalid">{errors.date_de_naissance}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                   </Row>
@@ -209,9 +241,9 @@ const DoctorCompleteProfile = () => {
                     variant="primary" 
                     size="lg" 
                     className="w-100"
-                    disabled={loading}
+                    disabled={isLoading}
                   >
-                    {loading ? (
+                    {isLoading ? (
                       <>
                         <Spinner animation="border" size="sm" className="me-2" />
                         Completing Profile...

@@ -3,15 +3,9 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use \Illuminate\Support\Facades\RateLimiter as RateLimiter;
-
-
-// Remove the globally defined functions:
-// renderAuthException, renderValidationException, renderGeneralException
-// as their logic is now handled within ->withExceptions()
+use Illuminate\Support\Facades\RateLimiter; // Ensure this Facade is imported
+use Illuminate\Cache\RateLimiting\Limit;    // Ensure Limit class is imported
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,16 +15,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Global HTTP middleware stack.
+        // HandleCors should be early, especially for preflight requests.
+        $middleware->use([
+            \Illuminate\Http\Middleware\TrustProxies::class,
+            \Illuminate\Http\Middleware\HandleCors::class, // Handles CORS headers
+            // Add other global middleware if necessary, e.g.:
+            // \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
+            // \Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance::class,
+            // \Illuminate\Http\Middleware\TrimStrings::class,
+            // \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        ]);
 
-        RateLimiter::for('api', function (Request $request) {
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-        });
-        // API middleware stack with Sanctum
+        // API specific middleware stack
+        // EnsureFrontendRequestsAreStateful is crucial for Sanctum SPA auth.
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
-
-        // Define middleware aliases
+        
+        // Middleware aliases
         $middleware->alias([
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
@@ -42,28 +45,41 @@ return Application::configure(basePath: dirname(__DIR__))
             'precognitive' => \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
             'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/EnsureEmailIsVerified.php]
+            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             
             // Custom middleware
-            'role' => \App\Http\Middleware\RoleMiddleware::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/RoleMiddleware.php]
-            'verified.doctor' => \App\Http\Middleware\VerifiedDoctor::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/VerifiedDoctor.php]
-            'active.user' => \App\Http\Middleware\ActiveUser::class, // [cite: therealest555/sihatech2/SIHATECH2-bfec2d9e1e08e8149fc892e74235c175d08bed7c/backend/app/Http/Middleware/ActiveUser.php]
+            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'verified.doctor' => \App\Http\Middleware\VerifiedDoctor::class,
+            'active.user' => \App\Http\Middleware\ActiveUser::class,
         ]);
 
-        // Enable rate limiting for all API routes
-        $middleware->throttleApi();
+        // Configure API rate limiting.
+        // This is the correct place for RateLimiter::for in Laravel 11.
+        // The "Facade root not set" error indicates an issue earlier in bootstrapping
+        // or with the RateLimiter service provider/cache setup.
+        try {
+            RateLimiter::for('api', function (Request $request) {
+                return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            });
+        } catch (\RuntimeException $e) {
+            // Log the fact that RateLimiter could not be configured here.
+            // This helps confirm if this specific block is the source of a bootstrap-time error.
+            error_log('Failed to configure RateLimiter in bootstrap/app.php: ' . $e->getMessage());
+            // Depending on your error handling preference, you might re-throw or handle differently.
+            // For now, we'll let it potentially fail if there's a deeper issue.
+        }
+        
+        $middleware->throttleApi(); // Applies the 'throttle:api' middleware group.
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Handle authentication exceptions for API
-        $exceptions->render(function (AuthenticationException $e, Request $request) {
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'message' => 'Unauthenticated. Please login.',
                 ], 401);
             }
-            // Fallback for non-API requests (though we shouldn't have any for an API-centric app)
-            // If you have web routes that might trigger this, you might redirect to a login page.
-            // For a pure API, returning JSON is appropriate.
             return response()->json(['message' => 'Unauthenticated (Non-API context)'], 401);
         });
 
@@ -71,33 +87,33 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
-                    'message' => 'Validation failed',
+                    'message' => $e->getMessage(),
                     'errors' => $e->errors(),
                 ], 422);
             }
-            // For non-API requests, re-throw to let Laravel handle it (e.g., redirect back with errors)
-            // For a pure API, this part might not be hit if all requests are API requests.
             throw $e;
         });
 
         // Handle general exceptions for API
         $exceptions->render(function (\Throwable $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
-                $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
-                $response = [
-                    'message' => $e->getMessage() ?: 'Server Error',
+                $status = $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface ? $e->getStatusCode() : 500;
+                
+                $responsePayload = [
+                    'message' => ($status === 500 && !config('app.debug')) ? 'Server Error' : $e->getMessage(),
                 ];
+
                 if (config('app.debug')) {
-                    $response['error'] = [
+                    $responsePayload['error_details'] = [
                         'exception' => get_class($e),
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
-                        'trace' => $e->getTrace() // Consider limiting trace in production even if debug is on for API
+                        // Limit trace in production or if too verbose
+                        'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 15),
                     ];
                 }
-                return response()->json($response, $status);
+                return response()->json($responsePayload, $status);
             }
-            // For non-API requests, re-throw to let Laravel handle it (e.g., show error page)
-            throw $e;
+            throw $e; 
         });
     })->create();

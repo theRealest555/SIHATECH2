@@ -1,122 +1,78 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Assuming you might want to use navigate from react-router
+import { useDispatch } from 'react-redux';
+import { setCredentials } from '../../redux/slices/authSlice'; // Import your setCredentials action
 
 const SocialAuthCallback = () => {
   const [status, setStatus] = useState('processing');
   const [message, setMessage] = useState('Please wait while we complete your authentication...');
   const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  const navigate = useNavigate(); // For programmatic navigation
 
   useEffect(() => {
-    processCallback();
-  }, []);
+    const processCallback = () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const userParam = urlParams.get('user');
+        const errorParam = urlParams.get('error');
+        const messageParam = urlParams.get('message'); // Backend might send a specific message with error
 
-  const processCallback = async () => {
-    try {
-      // Get URL parameters
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const error = urlParams.get('error');
-      const provider = window.location.pathname.split('/').slice(-2, -1)[0];
-
-      // Handle OAuth errors
-      if (error) {
-        setStatus('error');
-        setError(`Authentication failed: ${error}`);
-        
-        // Send message to parent window if opened as popup
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'SOCIAL_AUTH_ERROR',
-            error: `Authentication failed: ${error}`
-          }, '*');
-          setTimeout(() => window.close(), 2000);
+        if (errorParam) {
+          const decodedError = decodeURIComponent(messageParam || errorParam);
+          setStatus('error');
+          setError(decodedError);
+          if (window.opener) {
+            window.opener.postMessage({ type: 'SOCIAL_AUTH_ERROR', error: decodedError }, '*');
+            setTimeout(() => window.close(), 3000);
+          }
+          return;
         }
-        return;
-      }
 
-      // Check for authorization code
-      if (!code) {
-        const errorMsg = 'No authorization code received';
+        if (token && userParam) {
+          const userData = JSON.parse(decodeURIComponent(userParam));
+          
+          // Dispatch action to set credentials in Redux store and localStorage
+          dispatch(setCredentials({ user: userData, token }));
+
+          setStatus('success');
+          setMessage('Authentication successful! Redirecting...');
+
+          if (window.opener) {
+            window.opener.postMessage({ type: 'SOCIAL_AUTH_SUCCESS', data: { token, user: userData } }, '*');
+            setTimeout(() => window.close(), 1000); // Close popup after success
+          } else {
+            // Fallback: redirect directly if not a popup
+            setTimeout(() => {
+              // Example: Check if doctor profile completion is needed
+              if (userData.role === 'medecin' && !userData.doctor?.is_verified && !userData.doctor?.speciality_id) { // Adjust condition as per your user object structure
+                navigate('/doctor/complete-profile');
+              } else {
+                navigate('/dashboard');
+              }
+            }, 1500);
+          }
+        } else {
+          throw new Error('Authentication data (token or user info) not found in URL.');
+        }
+      } catch (err) {
+        console.error('Callback processing error:', err);
+        const errorMsg = `Authentication processing failed: ${err.message}`;
         setStatus('error');
         setError(errorMsg);
-        
         if (window.opener) {
-          window.opener.postMessage({
-            type: 'SOCIAL_AUTH_ERROR',
-            error: errorMsg
-          }, '*');
-          setTimeout(() => window.close(), 2000);
+          window.opener.postMessage({ type: 'SOCIAL_AUTH_ERROR', error: errorMsg }, '*');
+          setTimeout(() => window.close(), 3000);
         }
-        return;
       }
+    };
 
-      // Make request to backend callback
-      const callbackUrl = `/api/auth/social/${provider}/callback`;
-      const params = new URLSearchParams({
-        code: code,
-        state: state || ''
-      });
-
-      setMessage('Verifying with authentication provider...');
-
-      const response = await fetch(`http://localhost:8000${callbackUrl}?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Store authentication data
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
-
-      setStatus('success');
-      setMessage('Authentication successful! Redirecting...');
-
-      // Send success data to parent window if opened as popup
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'SOCIAL_AUTH_SUCCESS',
-          data: data
-        }, '*');
-        setTimeout(() => window.close(), 1000);
-      } else {
-        // Fallback: redirect directly
-        setTimeout(() => {
-          if (data.requires_profile_completion) {
-            window.location.href = '/complete-profile';
-          } else {
-            window.location.href = '/dashboard';
-          }
-        }, 2000);
-      }
-
-    } catch (err) {
-      console.error('Callback error:', err);
-      const errorMsg = `Authentication failed: ${err.message}`;
-      setStatus('error');
-      setError(errorMsg);
-      
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'SOCIAL_AUTH_ERROR',
-          error: errorMsg
-        }, '*');
-        setTimeout(() => window.close(), 2000);
-      }
-    }
-  };
+    processCallback();
+  }, [dispatch, navigate]);
 
   const getStatusIcon = () => {
+    // ... (same as your original file)
     switch (status) {
       case 'processing':
         return (
@@ -138,6 +94,7 @@ const SocialAuthCallback = () => {
   };
 
   const getAlertVariant = () => {
+    // ... (same as your original file)
     switch (status) {
       case 'success':
         return 'alert-success';
@@ -149,12 +106,15 @@ const SocialAuthCallback = () => {
   };
 
   const handleBackToLogin = () => {
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const handleTryAgain = () => {
-    window.location.reload();
+    // This might involve redirecting to the social provider again or specific logic
+    // For simplicity, navigating to login might be best if 'Try Again' is complex.
+    navigate('/login'); 
   };
+
 
   return (
     <div className="auth-container">
@@ -197,7 +157,7 @@ const SocialAuthCallback = () => {
                   <div className="mt-4">
                     <div className="d-flex justify-content-center">
                       <div className="spinner-border spinner-border-sm text-success me-2" role="status"></div>
-                      <span className="text-success">Redirecting to dashboard...</span>
+                      <span className="text-success">Redirecting...</span>
                     </div>
                   </div>
                 )}
@@ -218,26 +178,6 @@ const SocialAuthCallback = () => {
                       <i className="fas fa-redo me-2"></i>
                       Try Again
                     </button>
-                  </div>
-                )}
-
-                {/* Loading animation for visual feedback */}
-                {status === 'processing' && (
-                  <div className="mt-4">
-                    <div className="d-flex justify-content-center align-items-center">
-                      <div className="me-3">
-                        <i className="fab fa-google text-danger"></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="progress" style={{ height: '2px' }}>
-                          <div className="progress-bar bg-primary progress-bar-animated" style={{ width: '60%' }}></div>
-                        </div>
-                      </div>
-                      <div className="ms-3">
-                        <i className="fas fa-stethoscope text-primary"></i>
-                      </div>
-                    </div>
-                    <small className="text-muted">Connecting your account...</small>
                   </div>
                 )}
               </div>

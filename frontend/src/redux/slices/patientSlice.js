@@ -13,17 +13,24 @@ export const fetchPatientAppointments = createAsyncThunk(
       const { auth } = getState();
       const userRole = auth.user?.role;
       
-      // Determine if we're fetching for a patient or doctor
       const params = {};
+      // Backend's /api/appointments filters based on authenticated user's role and ID,
+      // or by doctor_id/patient_id if provided by an admin.
+      // For a patient fetching their own, or a doctor fetching theirs, no explicit ID param might be needed
+      // if the backend derives it from auth.
+      // However, if the 'id' param is meant to be doctor_id or patient_id for filtering (e.g. by admin or for public views)
+      // then it should be used. The current App.jsx logic seems to pass user.id.
       if (userRole === 'patient') {
-        params.patient_id = id;
+        // The general /api/appointments endpoint in backend should filter by authenticated patient user
       } else if (userRole === 'medecin') {
-        params.doctor_id = id;
+        // The general /api/appointments endpoint in backend should filter by authenticated doctor user
+      } else if (userRole === 'admin' && id) { // Admin might pass an ID to filter
+        // Depending on how admin views appointments, you might add params.patient_id or params.doctor_id
+        // For simplicity, assuming the backend /api/appointments handles role-based filtering automatically for patient/doctor
       }
       
       const response = await axios.get(API_URLS.APPOINTMENTS.LIST, { params });
       
-      // Backend returns { status: 'success', data: [...] }
       return response.data.data || [];
     } catch (error) {
       return rejectWithValue({
@@ -35,25 +42,25 @@ export const fetchPatientAppointments = createAsyncThunk(
 
 /**
  * Book a new appointment
- * Matches backend route: POST /api/appointments
+ * Matches backend route: POST /api/patient/doctors/{doctorId}/appointments
  */
 export const bookAppointment = createAsyncThunk(
   'patient/bookAppointment',
-  async ({ doctorId, patientId, date_heure }, { rejectWithValue }) => {
+  async ({ doctorId, date_heure }, { getState, rejectWithValue }) => { // Removed patientId from params
     try {
-      // Backend expects doctor_id not doctorId
-      const appointmentData = {
-        doctor_id: doctorId,
-        patient_id: patientId,
-        date_heure,
-      };
+      const { auth } = getState();
+      // Ensure user is authenticated and is a patient
+      if (!auth.user || auth.user.role !== 'patient') {
+        return rejectWithValue({ message: 'Only authenticated patients can book appointments.' });
+      }
       
+      // Backend AppointmentController::bookAppointment expects doctorId in URL and date_heure in body.
+      // It derives patient_id from the authenticated user.
       const response = await axios.post(
-        API_URLS.APPOINTMENTS.BOOK, 
-        appointmentData
+        API_URLS.APPOINTMENTS.BOOK(doctorId), // Uses the corrected function: /api/patient/doctors/{doctorId}/appointments
+        { date_heure } // Payload only contains date_heure
       );
       
-      // Backend returns { status: 'success', data: {...} }
       return response.data.data || {};
     } catch (error) {
       return rejectWithValue({
@@ -72,13 +79,12 @@ export const updateAppointmentStatus = createAsyncThunk(
   'patient/updateAppointmentStatus',
   async ({ appointmentId, status }, { rejectWithValue }) => {
     try {
-      // Backend expects 'statut' not 'status'
+      // Backend expects 'statut'
       const response = await axios.patch(
         API_URLS.APPOINTMENTS.UPDATE_STATUS(appointmentId), 
-        { statut: status }
+        { statut: status } // Ensure payload key is 'statut'
       );
       
-      // Backend returns { status: 'success', data: {...} }
       return response.data.data || {};
     } catch (error) {
       return rejectWithValue({
@@ -128,7 +134,8 @@ const patientSlice = createSlice({
       })
       .addCase(bookAppointment.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.appointments.push(action.payload);
+        // Optionally, add the new appointment to the list or refetch
+        state.appointments.push(action.payload); // Assuming payload is the new appointment
       })
       .addCase(bookAppointment.rejected, (state, action) => {
         state.status = 'failed';

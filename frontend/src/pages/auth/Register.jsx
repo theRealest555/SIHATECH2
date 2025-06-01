@@ -3,19 +3,24 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Form, Button, Alert, ButtonGroup, Spinner } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { register, selectAuthStatus, selectAuthError } from '../../redux/slices/authSlice';
-import { fetchDoctorSpecialities, selectDoctorSpecialities } from '../../redux/slices/doctorSlice';
-import { registerSchema } from '../../utils/validation';
-import { initializeCSRF } from '../../api/axios';
+import { fetchDoctorSpecialities, selectDoctorSpecialities, selectDoctorStatus as selectDocStatus } from '../../redux/slices/doctorSlice';
+import { registerSchema } from '../../utils/validation'; // Assuming yup schema is correctly defined
+import { initializeCSRF } from '../../api/axios'; // Ensure CSRF is initialized
 import { toast } from 'react-toastify';
 
 const Register = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  // Redux state selectors
   const authStatus = useSelector(selectAuthStatus);
   const authError = useSelector(selectAuthError);
-  const specialities = useSelector(selectDoctorSpecialities);
-  
-  const [userType, setUserType] = useState('patient');
+  const specialities = useSelector(selectDoctorSpecialities); // Expects array of {id, nom, ...}
+  const doctorDataStatus = useSelector(selectDocStatus);
+
+
+  // Local component state
+  const [userType, setUserType] = useState('patient'); // 'patient' or 'medecin'
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -23,94 +28,96 @@ const Register = () => {
     password: '',
     password_confirmation: '',
     telephone: '',
-    role: 'patient',
-    speciality_id: '',
+    role: 'patient', // Default role
+    speciality_id: '', // For doctors
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({}); // For client-side validation errors
 
+  // Effect to initialize CSRF and fetch specialities
   useEffect(() => {
-    // Initialize CSRF token
     initializeCSRF();
-    
-    // Fetch specialities for doctor registration
     dispatch(fetchDoctorSpecialities());
   }, [dispatch]);
 
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    
-    // Clear field-specific error when user types
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors({ ...errors, [name]: null });
+      setErrors((prev) => ({ ...prev, [name]: null }));
     }
   };
 
+  // Handle user type (role) change
   const handleUserTypeChange = (type) => {
     setUserType(type);
-    setFormData({ ...formData, role: type, speciality_id: '' });
-    
-    // Clear speciality error if switching from doctor
+    setFormData((prev) => ({
+      ...prev,
+      role: type,
+      speciality_id: type === 'patient' ? '' : prev.speciality_id, // Reset speciality if switching to patient
+    }));
     if (type !== 'medecin' && errors.speciality_id) {
-      setErrors({ ...errors, speciality_id: null });
+      setErrors((prev) => ({ ...prev, speciality_id: null }));
     }
   };
 
+  // Validate form using Yup schema
   const validateForm = async () => {
     try {
       await registerSchema.validate(formData, { abortEarly: false });
+      setErrors({}); // Clear previous errors if validation passes
       return true;
     } catch (validationError) {
       const newErrors = {};
       validationError.inner.forEach((error) => {
-        newErrors[error.path] = error.message;
+        if (error.path) {
+          newErrors[error.path] = error.message;
+        }
       });
       setErrors(newErrors);
       return false;
     }
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Clear previous errors
-    setErrors({});
-    
-    // Validate form
+    setErrors({}); // Clear previous backend errors
+
     const isValid = await validateForm();
     if (!isValid) return;
 
-    // Dispatch register action
     dispatch(register(formData))
       .unwrap()
       .then((result) => {
-        // Check if email verification is required
-        if (result.message && result.message.includes('verify')) {
+        toast.success(result.message || 'Registration successful! Please check your email.');
+        // Backend response includes a 'message' and 'user', 'token'
+        // Navigate based on whether email verification is implied by the message
+        if (result.message && result.message.toLowerCase().includes('verify')) {
           navigate('/verify-email');
         } else {
           navigate('/dashboard');
         }
       })
       .catch((error) => {
-        // Handle specific validation errors from backend
-        if (error.errors) {
-          const newErrors = {};
-          Object.entries(error.errors).forEach(([key, messages]) => {
-            newErrors[key] = messages[0];
-          });
-          setErrors(newErrors);
+        if (error.errors) { // Backend validation errors
+          setErrors(error.errors);
+          const firstErrorKey = Object.keys(error.errors)[0];
+          toast.error(error.errors[firstErrorKey][0] || 'Registration failed. Please check the form.');
+        } else {
+          toast.error(error.message || 'An unexpected error occurred during registration.');
         }
-        
-        // Show error toast
-        toast.error(error.message || 'Registration failed');
       });
   };
 
+  // Handle social authentication redirect
   const handleSocialAuth = (provider) => {
-    // Set role in session storage to pass to social auth
-    sessionStorage.setItem('authRole', userType);
+    sessionStorage.setItem('authRole', userType); // Pass role to backend if needed during social auth
     window.location.href = `http://localhost:8000/api/auth/social/${provider}/redirect?role=${userType}`;
   };
+
+  const isLoading = authStatus === 'loading';
+  const isLoadingSpecialities = doctorDataStatus === 'loading';
 
   return (
     <div className="auth-container">
@@ -125,14 +132,13 @@ const Register = () => {
                   <p className="text-muted">Join our healthcare platform</p>
                 </div>
 
-                {authError && (
+                {authError && !errors.email && !errors.password && ( // Display general auth error if no specific field errors
                   <Alert variant="danger" className="fade-in">
                     <i className="fas fa-exclamation-triangle me-2"></i>
-                    {authError}
+                    {typeof authError === 'string' ? authError : 'Registration failed. Please try again.'}
                   </Alert>
                 )}
 
-                {/* User Type Selection */}
                 <div className="mb-4">
                   <Form.Label className="fw-bold mb-3">I want to register as:</Form.Label>
                   <ButtonGroup className="w-100">
@@ -140,7 +146,7 @@ const Register = () => {
                       variant={userType === 'patient' ? 'primary' : 'outline-primary'}
                       onClick={() => handleUserTypeChange('patient')}
                       className="d-flex align-items-center justify-content-center"
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     >
                       <i className="fas fa-user me-2"></i>
                       Patient
@@ -149,7 +155,7 @@ const Register = () => {
                       variant={userType === 'medecin' ? 'primary' : 'outline-primary'}
                       onClick={() => handleUserTypeChange('medecin')}
                       className="d-flex align-items-center justify-content-center"
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     >
                       <i className="fas fa-user-md me-2"></i>
                       Doctor
@@ -161,10 +167,7 @@ const Register = () => {
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-user me-2"></i>
-                          First Name *
-                        </Form.Label>
+                        <Form.Label>First Name *</Form.Label>
                         <Form.Control
                           type="text"
                           name="prenom"
@@ -172,19 +175,14 @@ const Register = () => {
                           onChange={handleChange}
                           placeholder="Enter your first name"
                           isInvalid={!!errors.prenom}
-                          disabled={authStatus === 'loading'}
+                          disabled={isLoading}
                         />
-                        <Form.Control.Feedback type="invalid">
-                          {errors.prenom}
-                        </Form.Control.Feedback>
+                        <Form.Control.Feedback type="invalid">{errors.prenom}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-user me-2"></i>
-                          Last Name *
-                        </Form.Label>
+                        <Form.Label>Last Name *</Form.Label>
                         <Form.Control
                           type="text"
                           name="nom"
@@ -192,20 +190,15 @@ const Register = () => {
                           onChange={handleChange}
                           placeholder="Enter your last name"
                           isInvalid={!!errors.nom}
-                          disabled={authStatus === 'loading'}
+                          disabled={isLoading}
                         />
-                        <Form.Control.Feedback type="invalid">
-                          {errors.nom}
-                        </Form.Control.Feedback>
+                        <Form.Control.Feedback type="invalid">{errors.nom}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                   </Row>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-envelope me-2"></i>
-                      Email Address *
-                    </Form.Label>
+                    <Form.Label>Email Address *</Form.Label>
                     <Form.Control
                       type="email"
                       name="email"
@@ -213,20 +206,15 @@ const Register = () => {
                       onChange={handleChange}
                       placeholder="Enter your email address"
                       isInvalid={!!errors.email}
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.email}
-                    </Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">{errors.email}</Form.Control.Feedback>
                   </Form.Group>
 
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-lock me-2"></i>
-                          Password *
-                        </Form.Label>
+                        <Form.Label>Password *</Form.Label>
                         <Form.Control
                           type="password"
                           name="password"
@@ -234,22 +222,15 @@ const Register = () => {
                           onChange={handleChange}
                           placeholder="Create a password"
                           isInvalid={!!errors.password}
-                          disabled={authStatus === 'loading'}
+                          disabled={isLoading}
                         />
-                        <Form.Text className="text-muted">
-                          Minimum 8 characters
-                        </Form.Text>
-                        <Form.Control.Feedback type="invalid">
-                          {errors.password}
-                        </Form.Control.Feedback>
+                        <Form.Text className="text-muted">Minimum 8 characters</Form.Text>
+                        <Form.Control.Feedback type="invalid">{errors.password}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>
-                          <i className="fas fa-lock me-2"></i>
-                          Confirm Password *
-                        </Form.Label>
+                        <Form.Label>Confirm Password *</Form.Label>
                         <Form.Control
                           type="password"
                           name="password_confirmation"
@@ -257,20 +238,15 @@ const Register = () => {
                           onChange={handleChange}
                           placeholder="Confirm your password"
                           isInvalid={!!errors.password_confirmation}
-                          disabled={authStatus === 'loading'}
+                          disabled={isLoading}
                         />
-                        <Form.Control.Feedback type="invalid">
-                          {errors.password_confirmation}
-                        </Form.Control.Feedback>
+                        <Form.Control.Feedback type="invalid">{errors.password_confirmation}</Form.Control.Feedback>
                       </Form.Group>
                     </Col>
                   </Row>
 
                   <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-phone me-2"></i>
-                      Phone Number
-                    </Form.Label>
+                    <Form.Label>Phone Number</Form.Label>
                     <Form.Control
                       type="tel"
                       name="telephone"
@@ -278,11 +254,9 @@ const Register = () => {
                       onChange={handleChange}
                       placeholder="Enter your phone number"
                       isInvalid={!!errors.telephone}
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.telephone}
-                    </Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">{errors.telephone}</Form.Control.Feedback>
                   </Form.Group>
 
                   {userType === 'medecin' && (
@@ -292,27 +266,22 @@ const Register = () => {
                         Professional Information
                       </h6>
                       <Form.Group className="mb-0">
-                        <Form.Label>
-                          <i className="fas fa-graduation-cap me-2"></i>
-                          Medical Speciality *
-                        </Form.Label>
+                        <Form.Label>Medical Speciality *</Form.Label>
                         <Form.Select
                           name="speciality_id"
                           value={formData.speciality_id}
                           onChange={handleChange}
                           isInvalid={!!errors.speciality_id}
-                          disabled={authStatus === 'loading'}
+                          disabled={isLoading || isLoadingSpecialities}
                         >
-                          <option value="">Select a speciality...</option>
-                          {specialities.map((spec, index) => (
-                            <option key={index} value={index + 1}>
-                              {spec}
+                          <option value="">{isLoadingSpecialities ? "Loading..." : "Select a speciality..."}</option>
+                          {Array.isArray(specialities) && specialities.map((spec) => (
+                            <option key={spec.id} value={spec.id}>
+                              {spec.nom}
                             </option>
                           ))}
                         </Form.Select>
-                        <Form.Control.Feedback type="invalid">
-                          {errors.speciality_id}
-                        </Form.Control.Feedback>
+                        <Form.Control.Feedback type="invalid">{errors.speciality_id}</Form.Control.Feedback>
                       </Form.Group>
                     </div>
                   )}
@@ -322,9 +291,9 @@ const Register = () => {
                     variant="primary" 
                     size="lg" 
                     className="w-100 mb-3"
-                    disabled={authStatus === 'loading'}
+                    disabled={isLoading}
                   >
-                    {authStatus === 'loading' ? (
+                    {isLoading ? (
                       <>
                         <Spinner animation="border" size="sm" className="me-2" />
                         Creating Account...
@@ -355,7 +324,7 @@ const Register = () => {
                       variant="outline-danger"
                       className="social-btn"
                       onClick={() => handleSocialAuth('google')}
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     >
                       <i className="fab fa-google me-2"></i>
                       Continue with Google
@@ -364,7 +333,7 @@ const Register = () => {
                       variant="outline-primary"
                       className="social-btn"
                       onClick={() => handleSocialAuth('facebook')}
-                      disabled={authStatus === 'loading'}
+                      disabled={isLoading}
                     >
                       <i className="fab fa-facebook-f me-2"></i>
                       Continue with Facebook
