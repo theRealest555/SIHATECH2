@@ -1,129 +1,102 @@
+// src/components/layouts/Navbar.jsx
 import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Navbar as BootstrapNavbar, Nav, NavDropdown, Container, Button } from 'react-bootstrap';
-import { useSelector, useDispatch } from 'react-redux';
-import { selectIsAuthenticated, selectCurrentUser, logout } from '../../redux/slices/authSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth'; // Corrected path
+import { FaUserCircle, FaSignOutAlt, FaTachometerAlt, FaSignInAlt, FaUserPlus } from 'react-icons/fa'; // Example icons
 
 const Navbar = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const dispatch = useDispatch();
-  const isAuthenticated = useSelector(selectIsAuthenticated);
-  const user = useSelector(selectCurrentUser);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
-  const handleLogout = () => {
-    dispatch(logout())
-      .unwrap()
-      .then(() => {
-        navigate('/login');
-      })
-      .catch((error) => {
-        console.error('Logout failed:', error);
-        navigate('/login');
-      });
-  };
+    const handleLogout = async () => {
+        await logout();
+        // Navigation is handled within the logout function in AuthContext
+    };
 
-  // Don't show navbar on auth pages
-  const hideNavbarPaths = ['/login', '/register', '/admin/login', '/verify-email'];
-  if (hideNavbarPaths.includes(location.pathname)) {
-    return null;
-  }
+    const getDashboardPath = () => {
+        if (!user) return '/';
+        switch (user.role) {
+            case 'admin':
+                return '/admin/dashboard';
+            case 'doctor':
+                return '/doctor/dashboard';
+            case 'patient':
+                return '/patient/dashboard';
+            default:
+                return '/dashboard'; // A generic dashboard or redirector component
+        }
+    };
+    
+    const getProfilePath = () => {
+        if (!user) return '/login';
+        switch (user.role) {
+            case 'admin':
+                return '/admin/profile'; // Assuming an admin profile page
+            case 'doctor':
+                return '/doctor/profile';
+            case 'patient':
+                return '/patient/profile';
+            default:
+                return '/profile'; 
+        }
+    };
 
-  return (
-    <BootstrapNavbar bg="primary" variant="dark" expand="lg" className="shadow-sm">
-      <Container>
-        <BootstrapNavbar.Brand as={Link} to="/dashboard" className="fw-bold">
-          <i className="fas fa-stethoscope me-2"></i>
-          MedConnect
-        </BootstrapNavbar.Brand>
-        
-        <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />
-        <BootstrapNavbar.Collapse id="basic-navbar-nav">
-          {isAuthenticated ? (
-            <>
-              <Nav className="me-auto">
-                <Nav.Link as={Link} to="/dashboard" active={location.pathname === '/dashboard'}>
-                  <i className="fas fa-home me-1"></i>
-                  Dashboard
-                </Nav.Link>
-                
-                {user?.role === 'patient' && (
-                  <>
-                    <Nav.Link as={Link} to="/patient" active={location.pathname === '/patient'}>
-                      <i className="fas fa-search me-1"></i>
-                      Find Doctor
-                    </Nav.Link>
-                  </>
-                )}
-                
-                {user?.role === 'medecin' && (
-                  <>
-                    <Nav.Link as={Link} to="/doctor" active={location.pathname === '/doctor'}>
-                      <i className="fas fa-calendar me-1"></i>
-                      My Calendar
-                    </Nav.Link>
-                    <NavDropdown title={<><i className="fas fa-cog me-1"></i>Manage</>} id="doctor-dropdown">
-                      <NavDropdown.Item as={Link} to="/schedule">
-                        <i className="fas fa-clock me-2"></i>
-                        Update Schedule
-                      </NavDropdown.Item>
-                      <NavDropdown.Item as={Link} to="/leaves">
-                        <i className="fas fa-calendar-times me-2"></i>
-                        Manage Leaves
-                      </NavDropdown.Item>
-                      <NavDropdown.Item as={Link} to={`/doctor/${user.id}/appointments`}>
-                        <i className="fas fa-list me-2"></i>
-                        View Appointments
-                      </NavDropdown.Item>
-                    </NavDropdown>
-                  </>
-                )}
-              </Nav>
-              
-              <Nav>
-                <NavDropdown 
-                  title={
-                    <span>
-                      <i className="fas fa-user-circle me-1"></i>
-                      {user?.prenom} {user?.nom}
-                    </span>
-                  } 
-                  id="user-dropdown"
-                  align="end"
-                >
-                  <NavDropdown.Item as={Link} to={user?.role === 'patient' ? '/patient/profile' : '/doctor/profile'}>
-                    <i className="fas fa-user me-2"></i>
-                    My Profile
-                  </NavDropdown.Item>
-                  <NavDropdown.Divider />
-                  <NavDropdown.Item onClick={handleLogout}>
-                    <i className="fas fa-sign-out-alt me-2"></i>
-                    Logout
-                  </NavDropdown.Item>
-                </NavDropdown>
-              </Nav>
-            </>
-          ) : (
-            <Nav className="ms-auto">
-              <Button 
-                variant="outline-light" 
-                className="me-2" 
-                onClick={() => navigate('/login')}
-              >
-                Login
-              </Button>
-              <Button 
-                variant="light" 
-                onClick={() => navigate('/register')}
-              >
-                Register
-              </Button>
-            </Nav>
-          )}
-        </BootstrapNavbar.Collapse>
-      </Container>
-    </BootstrapNavbar>
-  );
+
+    return (
+        <nav className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-20">
+                    <div className="flex items-center">
+                        <Link to="/" className="text-2xl font-bold tracking-tight hover:text-indigo-200 transition duration-150">
+                           SIHA<span className="text-blue-300">TECH</span>
+                        </Link>
+                    </div>
+                    <div className="hidden md:block">
+                        <div className="ml-10 flex items-baseline space-x-4">
+                            <Link to="/" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">Home</Link>
+                            <Link to="/doctors" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">Find a Doctor</Link>
+                            <Link to="/subscription-plans" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">Plans</Link>
+                            {/* Add more public links as needed */}
+                        </div>
+                    </div>
+                    <div className="hidden md:block">
+                        <div className="ml-4 flex items-center md:ml-6">
+                            {user ? (
+                                <>
+                                    <span className="mr-3 text-sm">
+                                        Welcome, {user.first_name || user.name || 'User'} ({user.role})
+                                    </span>
+                                    <Link to={getDashboardPath()} className="p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white" title="Dashboard">
+                                        <FaTachometerAlt className="h-6 w-6" />
+                                    </Link>
+                                    <Link to={getProfilePath()} className="ml-3 p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white" title="Profile">
+                                        <FaUserCircle className="h-6 w-6" />
+                                    </Link>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="ml-3 p-2 rounded-full text-red-300 hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition duration-150"
+                                        title="Logout"
+                                    >
+                                        <FaSignOutAlt className="h-6 w-6" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <Link to="/login" className="flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">
+                                        <FaSignInAlt className="mr-1" /> Login
+                                    </Link>
+                                    <Link to="/register" className="flex items-center ml-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-500 hover:bg-blue-400 transition duration-150">
+                                       <FaUserPlus className="mr-1" /> Sign Up
+                                    </Link>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    {/* Mobile menu button (implement if needed) */}
+                </div>
+            </div>
+        </nav>
+    );
 };
 
 export default Navbar;

@@ -1,202 +1,119 @@
 // src/App.jsx
-import { useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import { useDispatch } from 'react-redux';
-import 'react-toastify/dist/ReactToastify.css';
-
-import { checkAuth } from './redux/slices/authSlice';
-import { initializeCSRF } from './api/axios';
-
-// Layout
 import MainLayout from './components/layouts/MainLayout';
-
-// Auth pages
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import AdminLogin from './pages/auth/AdminLogin';
-import VerifyEmail from './pages/auth/VerifyEmail';
-import DoctorCompleteProfile from './pages/auth/DoctorCompleteProfile';
-
-// Dashboard + Profiles
-import Dashboard from './pages/Dashboard';
-import PatientProfile from './pages/patient/Profile';
-import DoctorProfile from './pages/doctor/Profile';
-
-// Components used in routes
 import PrivateRoute from './components/ui/PrivateRoute';
-import DoctorSearch from './components/DoctorSearch';
-import DoctorCalendar from './components/DoctorCalendar';
-import PatientAppointments from './components/PatientAppointments';
-import AppointmentList from './components/AppointmentList';
-import ScheduleForm from './components/ScheduleForm';
-import LeaveForm from './components/LeaveForm';
+import { useAuth } from './hooks/useAuth';
+import './App.css'; // Assuming you have a global CSS file for styles
 
-const App = () => {
-  const dispatch = useDispatch();
 
-  useEffect(() => {
-    // Ensure CSRF token is initialized before any requests
-    initializeCSRF();
+// Lazy load pages
+const HomePage = lazy(() => import('./pages/HomePage'));
+const LoginPage = lazy(() => import('./pages/auth/Login'));
+const RegisterPage = lazy(() => import('./pages/auth/Register'));
+const AdminLoginPage = lazy(() => import('./pages/auth/AdminLogin'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmail')); // Assuming this exists or will be created
+const ForgotPasswordPage = lazy(() => import('./components/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./components/auth/ResetPasswordPage'));
 
-    // Check if the user is already authenticated
-    dispatch(checkAuth());
-  }, [dispatch]);
+
+// User specific Profile Pages
+const DoctorProfilePage = lazy(() => import('./pages/doctor/Profile'));
+const PatientProfilePage = lazy(() => import('./pages/patient/Profile'));
+const DoctorCompleteProfilePage = lazy(() => import('./pages/auth/DoctorCompleteProfile'));
+
+// Dashboards
+const DashboardPage = lazy(() => import('./pages/Dashboard')); // Generic or role-based redirector
+const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
+const DoctorDashboardPage = lazy(() => import('./pages/doctor/DashboardPage'));
+const PatientDashboardPage = lazy(() => import('./pages/patient/DashboardPage'));
+
+// Admin Pages
+const UserListPage = lazy(() => import('./pages/admin/UserListPage'));
+// ... other admin pages
+
+// Doctor Pages
+const DoctorAppointmentsPage = lazy(() => import('./pages/doctor/AppointmentsPage'));
+const DoctorAvailabilityPage = lazy(() => import('./pages/doctor/AvailabilityPage'));
+const DoctorDocumentsPage = lazy(() => import('./pages/doctor/DocumentsPage'));
+const DoctorStatisticsPage = lazy(() => import('./pages/doctor/StatisticsPage'));
+
+
+// Patient Pages
+const PatientAppointmentsPage = lazy(() => import('./pages/patient/AppointmentsPage'));
+const FindDoctorPage = lazy(() => import('./pages/patient/FindDoctorPage'));
+const PublicDoctorProfileViewPage = lazy(() => import('./pages/patient/DoctorProfilePage')); // Public view
+
+// Subscription Pages
+const SubscriptionPlansPage = lazy(() => import('./pages/subscriptions/PlansPage'));
+const SubscriptionStatusPage = lazy(() => import('./pages/subscriptions/SubscriptionStatusPage'));
+
+// Social Auth Callback
+const SocialAuthCallback = lazy(() => import('./components/SocialAuthCallback'));
+
+
+function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl font-semibold">Loading Application...</div>
+        {/* You can use a spinner component here */}
+      </div>
+    );
+  }
 
   return (
-    <>
-      <ToastContainer position="top-right" autoClose={3000} />
-
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading page...</div>}>
       <Routes>
-        {/* ======================
-            Public (no auth required)
-        ======================= */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-
-        {/* ============================================
-            All protected routes live under MainLayout
-               (only reachable when authenticated)
-           ============================================ */}
+        {/* Public Routes */}
         <Route path="/" element={<MainLayout />}>
-          {/* Doctor Profile Completion (authenticated, but no email‐verification check) */}
-          <Route
-            path="doctor/complete-profile"
-            element={
-              <PrivateRoute allowedRoles={['medecin']} requireVerification={false}>
-                <DoctorCompleteProfile />
-              </PrivateRoute>
-            }
-          />
+          <Route index element={<HomePage />} />
+          <Route path="login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
+          <Route path="register" element={!user ? <RegisterPage /> : <Navigate to="/dashboard" />} />
+          <Route path="admin/login" element={!user ? <AdminLoginPage /> : <Navigate to="/admin/dashboard" />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password/:token" element={<ResetPasswordPage />} /> {/* Ensure backend route matches */}
+          <Route path="email/verify/:id/:hash" element={<VerifyEmailPage />} /> {/* Ensure backend route matches */}
+          <Route path="doctors" element={<FindDoctorPage />} /> {/* Public doctor search */}
+          <Route path="doctors/:doctorId" element={<PublicDoctorProfileViewPage />} /> {/* Public doctor profile */}
+          <Route path="subscription-plans" element={<SubscriptionPlansPage />} />
+          <Route path="/auth/:provider/callback" element={<SocialAuthCallback />} />
 
-          {/* Redirect “/” → “/dashboard” by default */}
-          <Route index element={<Navigate to="/dashboard" replace />} />
 
-          {/* Dashboard (any authenticated user) */}
-          <Route
-            path="dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
+          {/* Authenticated Routes */}
+          <Route path="dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+          
+          {/* Patient Routes */}
+          <Route path="patient/dashboard" element={<PrivateRoute roles={['patient']}><PatientDashboardPage /></PrivateRoute>} />
+          <Route path="patient/profile" element={<PrivateRoute roles={['patient']}><PatientProfilePage /></PrivateRoute>} />
+          <Route path="patient/appointments" element={<PrivateRoute roles={['patient']}><PatientAppointmentsPage /></PrivateRoute>} />
+          
+          {/* Doctor Routes */}
+          <Route path="doctor/dashboard" element={<PrivateRoute roles={['doctor']}><DoctorDashboardPage /></PrivateRoute>} />
+          <Route path="doctor/complete-profile" element={<PrivateRoute roles={['doctor']}><DoctorCompleteProfilePage /></PrivateRoute>} />
+          <Route path="doctor/profile" element={<PrivateRoute roles={['doctor']}><DoctorProfilePage /></PrivateRoute>} />
+          <Route path="doctor/appointments" element={<PrivateRoute roles={['doctor']}><DoctorAppointmentsPage /></PrivateRoute>} />
+          <Route path="doctor/availability" element={<PrivateRoute roles={['doctor']}><DoctorAvailabilityPage /></PrivateRoute>} />
+          <Route path="doctor/documents" element={<PrivateRoute roles={['doctor']}><DoctorDocumentsPage /></PrivateRoute>} />
+          <Route path="doctor/statistics" element={<PrivateRoute roles={['doctor']}><DoctorStatisticsPage /></PrivateRoute>} />
 
-          {/* ======================
-              Patient‐only routes
-             ====================== */}
-          <Route path="patient">
-            {/* “/patient” → redirect to “/patient/profile” */}
-            <Route index element={<Navigate to="profile" replace />} />
 
-            <Route
-              path="profile"
-              element={
-                <PrivateRoute allowedRoles={['patient']}>
-                  <PatientProfile />
-                </PrivateRoute>
-              }
-            />
+          {/* Admin Routes */}
+          <Route path="admin/dashboard" element={<PrivateRoute roles={['admin']}><AdminDashboardPage /></PrivateRoute>} />
+          <Route path="admin/users" element={<PrivateRoute roles={['admin']}><UserListPage /></PrivateRoute>} />
+          {/* Add other admin routes here: e.g., /admin/doctors-verification, /admin/reports */}
 
-            {/* Searching for a doctor */}
-            <Route
-              path="search"
-              element={
-                <PrivateRoute allowedRoles={['patient']}>
-                  <DoctorSearch />
-                </PrivateRoute>
-              }
-            />
+          {/* Subscription Management for Authenticated Users */}
+          <Route path="my-subscription" element={<PrivateRoute><SubscriptionStatusPage /></PrivateRoute>} />
 
-            {/* Viewing appointments with a specific doctor */}
-            <Route
-              path="appointments/:doctorId"
-              element={
-                <PrivateRoute allowedRoles={['patient']}>
-                  <AppointmentList />
-                </PrivateRoute>
-              }
-            />
-          </Route>
-
-          {/* ======================
-              Doctor‐only routes
-             ====================== */}
-          <Route path="doctor">
-            {/* “/doctor” → redirect to “/doctor/profile” */}
-            <Route index element={<Navigate to="profile" replace />} />
-
-            <Route
-              path="profile"
-              element={
-                <PrivateRoute allowedRoles={['medecin']}>
-                  <DoctorProfile />
-                </PrivateRoute>
-              }
-            />
-
-            {/* Doctor’s personal calendar (no dynamic ID needed: the component can fetch from Redux/auth) */}
-            <Route
-              path="calendar"
-              element={
-                <PrivateRoute allowedRoles={['medecin']}>
-                  <DoctorCalendar />
-                </PrivateRoute>
-              }
-            />
-
-            {/* If you pass a doctorId explicitly in the URL */}
-            <Route
-              path="calendar/:doctorId"
-              element={
-                <PrivateRoute allowedRoles={['medecin']}>
-                  <DoctorCalendar />
-                </PrivateRoute>
-              }
-            />
-
-            {/* A doctor viewing appointments for a given patient */}
-            <Route
-              path="appointments/:doctorId"
-              element={
-                <PrivateRoute allowedRoles={['medecin']}>
-                  <PatientAppointments />
-                </PrivateRoute>
-              }
-            />
-          </Route>
-
-          {/* ======================
-              Schedule & Leave (Doctor only)
-             ====================== */}
-          <Route
-            path="schedule"
-            element={
-              <PrivateRoute allowedRoles={['medecin']}>
-                <ScheduleForm />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="leaves"
-            element={
-              <PrivateRoute allowedRoles={['medecin']}>
-                <LeaveForm />
-              </PrivateRoute>
-            }
-          />
-
-          {/* If none of the above child‐routes match, redirect to /dashboard */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Fallback for authenticated users inside MainLayout */}
+          <Route path="*" element={<Navigate to="/" />} /> 
         </Route>
-
-        {/* If the user tries to hit a top‐level route that doesn’t exist, go to /dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </>
+    </Suspense>
   );
-};
+}
 
 export default App;

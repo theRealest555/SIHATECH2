@@ -1,234 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { useDispatch, useSelector } from 'react-redux';
-import { login, selectAuthStatus, selectAuthError } from '../../redux/slices/authSlice';
-import { loginSchema } from '../../utils/validation';
-import { initializeCSRF } from '../../api/axios';
-import { toast } from 'react-toastify';
+// src/pages/auth/Login.jsx
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { FaEnvelope, FaLock, FaSignInAlt, FaGoogle, FaFacebook } from 'react-icons/fa'; // Example icons
+import AuthLayout from '../../components/auth/AuthLayout'; // Assuming you create this
 
-const Login = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const dispatch = useDispatch();
-  const authStatus = useSelector(selectAuthStatus);
-  const authError = useSelector(selectAuthError);
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [errors, setErrors] = useState({});
-  const [socialAuthError, setSocialAuthError] = useState(null);
+const LoginPage = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
+    const { login, authError, loading } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const from = location.state?.from?.pathname || '/dashboard';
 
-  useEffect(() => {
-    // Initialize CSRF token
-    initializeCSRF();
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const success = await login({ email, password, remember: rememberMe });
+        if (success) {
+            // Navigation will be handled by App.jsx based on user role after user state is updated
+            // Or, if login directly returns user data with role:
+            // const user = authContext.user; // assuming login updates context immediately
+            // if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
+            // else navigate(from, { replace: true });
+             navigate(from, { replace: true });
+        }
+    };
     
-    // Listen for social auth messages from popup window
-    const handleMessage = (event) => {
-      if (event.data.type === 'SOCIAL_AUTH_SUCCESS') {
-        // Redirect to dashboard
-        navigate('/dashboard');
-      } else if (event.data.type === 'SOCIAL_AUTH_ERROR') {
-        setSocialAuthError(event.data.error);
-      }
+    const handleSocialLogin = (provider) => {
+        // Construct the full backend URL for Socialite redirect
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        window.location.href = `${backendUrl}/api/auth/${provider}/redirect`;
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [navigate]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    
-    // Clear field-specific error when user types
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: null });
-    }
-  };
-
-  const validateForm = async () => {
-    try {
-      await loginSchema.validate(formData, { abortEarly: false });
-      return true;
-    } catch (validationError) {
-      const newErrors = {};
-      validationError.inner.forEach((error) => {
-        newErrors[error.path] = error.message;
-      });
-      setErrors(newErrors);
-      return false;
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    setErrors({});
-    setSocialAuthError(null);
-    
-    // Validate form
-    const isValid = await validateForm();
-    if (!isValid) return;
-
-    // Dispatch login action
-    dispatch(login(formData))
-      .unwrap()
-      .then(() => {
-        // Redirect to intended page or dashboard
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from);
-      })
-      .catch((error) => {
-        // Handle specific validation errors from backend
-        if (error.errors) {
-          const newErrors = {};
-          Object.entries(error.errors).forEach(([key, messages]) => {
-            newErrors[key] = messages[0];
-          });
-          setErrors(newErrors);
-        }
-        
-        // Show error toast
-        toast.error(error.message || 'Login failed');
-      });
-  };
-
-  const handleSocialAuth = (provider) => {
-    window.location.href = `http://localhost:8000/api/auth/social/${provider}/redirect`;
-  };
-
-  return (
-    <div className="auth-container">
-      <Container>
-        <Row className="justify-content-center">
-          <Col md={6} lg={5}>
-            <Card className="auth-card">
-              <Card.Body className="p-5">
-                <div className="text-center mb-4">
-                  <i className="fas fa-stethoscope fa-3x text-primary mb-3"></i>
-                  <h2 className="auth-header">Welcome Back</h2>
-                  <p className="text-muted">Sign in to your account</p>
+    return (
+        <AuthLayout title="Welcome Back!" subtitle="Login to access your SihaTech account.">
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {authError && <p className="text-red-500 text-sm bg-red-100 p-3 rounded-md">{authError}</p>}
+                
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Email address
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FaEnvelope className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            placeholder="you@example.com"
+                        />
+                    </div>
                 </div>
 
-                {(authError || socialAuthError) && (
-                  <Alert variant="danger" className="fade-in">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    {socialAuthError || authError}
-                  </Alert>
-                )}
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                        Password
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FaLock className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autoComplete="current-password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                </div>
 
-                <Form onSubmit={handleSubmit} noValidate>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-envelope me-2" /> Email Address
-                    </Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter your email"
-                      isInvalid={!!errors.email}
-                      disabled={authStatus === 'loading'}
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.email}
-                    </Form.Control.Feedback>
-                  </Form.Group>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                        <input
+                            id="remember-me"
+                            name="remember-me"
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                            Remember me
+                        </label>
+                    </div>
+                    <div className="text-sm">
+                        <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
+                            Forgot your password?
+                        </Link>
+                    </div>
+                </div>
 
-                  <Form.Group className="mb-4">
-                    <Form.Label>
-                      <i className="fas fa-lock me-2"></i>
-                      Password
-                    </Form.Label>
-                    <Form.Control
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Enter your password"
-                      isInvalid={!!errors.password}
-                      disabled={authStatus === 'loading'}
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.password}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Button 
-                    type="submit" 
-                    variant="primary" 
-                    size="lg" 
-                    className="w-100 mb-3"
-                    disabled={authStatus === 'loading'}
-                  >
-                    {authStatus === 'loading' ? (
-                      <>
-                        <Spinner animation="border" size="sm" className="me-2" />
-                        Signing In...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-sign-in-alt me-2"></i>
-                        Sign In
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="text-center mb-3">
-                    <span className="text-muted">Don't have an account? </span>
-                    <Link to="/register" className="text-decoration-none fw-bold">
-                      Create Account
-                    </Link>
-                  </div>
-
-                  <hr className="my-4" />
-                  
-                  <div className="text-center mb-2">
-                    <small className="text-muted">Or continue with</small>
-                  </div>
-
-                  <div className="d-grid gap-2">
-                    <Button
-                      variant="outline-danger"
-                      className="social-btn"
-                      onClick={() => handleSocialAuth('google')}
-                      disabled={authStatus === 'loading'}
+                <div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
-                      <i className="fab fa-google me-2"></i>
-                      Continue with Google
-                    </Button>
-                    <Button
-                      variant="outline-primary"
-                      className="social-btn"
-                      onClick={() => handleSocialAuth('facebook')}
-                      disabled={authStatus === 'loading'}
-                    >
-                      <i className="fab fa-facebook-f me-2"></i>
-                      Continue with Facebook
-                    </Button>
-                  </div>
+                        {loading ? 'Signing in...' : 'Sign in'}
+                        {!loading && <FaSignInAlt className="ml-2 h-5 w-5" />}
+                    </button>
+                </div>
+            </form>
+            
+            <div className="mt-6">
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    </div>
+                </div>
 
-                  <div className="text-center mt-4">
-                    <Link to="/admin/login" className="text-muted text-decoration-none">
-                      <small>
-                        <i className="fas fa-user-shield me-1"></i>
-                        Admin Login
-                      </small>
-                    </Link>
-                  </div>
-                </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
-  );
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div>
+                        <button
+                            onClick={() => handleSocialLogin('google')}
+                            className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                        >
+                            <FaGoogle className="w-5 h-5 mr-2 text-red-500" />
+                            Google
+                        </button>
+                    </div>
+                    <div>
+                        <button
+                            onClick={() => handleSocialLogin('facebook')}
+                            className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                        >
+                           <FaFacebook className="w-5 h-5 mr-2 text-blue-600" />
+                            Facebook
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+            <p className="mt-8 text-center text-sm text-gray-600">
+                Not a member?{' '}
+                <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+                    Create an account
+                </Link>
+            </p>
+             <p className="mt-2 text-center text-sm text-gray-600">
+                Are you an Admin?{' '}
+                <Link to="/admin/login" className="font-medium text-green-600 hover:text-green-500">
+                    Login here
+                </Link>
+            </p>
+        </AuthLayout>
+    );
 };
 
-export default Login;
+export default LoginPage;

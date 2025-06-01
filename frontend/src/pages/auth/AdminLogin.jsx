@@ -1,195 +1,101 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import axios from '../../api/axios';
-import { loginSchema } from '../../utils/validation';
-import { useDispatch } from 'react-redux';
-import { setCredentials } from '../../redux/slices/authSlice';
-import { initializeCSRF } from '../../api/axios';
-import { toast } from 'react-toastify';
+// src/pages/auth/AdminLogin.jsx
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { FaUserShield, FaEnvelope, FaLock, FaSignInAlt } from 'react-icons/fa';
+import AuthLayout from '../../components/auth/AuthLayout';
 
-const AdminLogin = () => {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    // Initialize CSRF token
-    initializeCSRF();
-  }, []);
+const AdminLoginPage = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const { login, authError, loading } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const from = location.state?.from?.pathname || '/admin/dashboard';
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    
-    // Clear field-specific error when user types
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: null });
-    }
-  };
 
-  const validateForm = async () => {
-    try {
-      await loginSchema.validate(formData, { abortEarly: false });
-      return true;
-    } catch (validationError) {
-      const newErrors = {};
-      validationError.inner.forEach((error) => {
-        newErrors[error.path] = error.message;
-      });
-      setErrors(newErrors);
-      return false;
-    }
-  };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const success = await login({ email, password }, true); // true for isAdmin
+        if (success) {
+            navigate(from, { replace: true });
+        }
+    };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    setErrors({});
-    setError(null);
-    
-    // Validate form
-    const isValid = await validateForm();
-    if (!isValid) return;
-
-    setLoading(true);
-    
-    try {
-      const response = await axios.post('/api/admin/login', formData);
-      
-      if (response.data.token) {
-        // Store auth data in Redux and localStorage
-        dispatch(setCredentials({
-          user: response.data.user,
-          token: response.data.token
-        }));
-        
-        // Redirect to admin dashboard
-        navigate('/admin/dashboard');
-      }
-    } catch (err) {
-      // Handle error
-      setError(err.response?.data?.message || 'Login failed');
-      
-      // Handle validation errors
-      if (err.response?.data?.errors) {
-        const validationErrors = {};
-        Object.entries(err.response.data.errors).forEach(([key, messages]) => {
-          validationErrors[key] = messages[0];
-        });
-        setErrors(validationErrors);
-      }
-      
-      toast.error(err.response?.data?.message || 'Admin login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="auth-container">
-      <Container>
-        <Row className="justify-content-center">
-          <Col md={6} lg={5}>
-            <Card className="auth-card">
-              <Card.Body className="p-5">
-                <div className="text-center mb-4">
-                  <i className="fas fa-user-shield fa-3x text-primary mb-3"></i>
-                  <h2 className="auth-header">Admin Login</h2>
-                  <p className="text-muted">Sign in to access administrative features</p>
+    return (
+        <AuthLayout title="Admin Portal" subtitle="Secure login for SihaTech administrators.">
+             <div className="text-center mb-6">
+                <FaUserShield className="mx-auto h-16 w-16 text-indigo-600" />
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {authError && <p className="text-red-500 text-sm bg-red-100 p-3 rounded-md">{authError}</p>}
+                
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Admin Email
+                    </label>
+                     <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FaEnvelope className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            placeholder="admin@sihatech.com"
+                        />
+                    </div>
                 </div>
 
-                {error && (
-                  <Alert variant="danger" className="fade-in">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    {error}
-                  </Alert>
-                )}
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                        Password
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FaLock className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autoComplete="current-password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                </div>
+                
+                {/* Optional: Remember me for admin */}
 
-                <Form onSubmit={handleSubmit} noValidate>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      <i className="fas fa-envelope me-2"></i>
-                      Email Address
-                    </Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter admin email"
-                      isInvalid={!!errors.email}
-                      disabled={loading}
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.email}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-4">
-                    <Form.Label>
-                      <i className="fas fa-lock me-2"></i>
-                      Password
-                    </Form.Label>
-                    <Form.Control
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Enter admin password"
-                      isInvalid={!!errors.password}
-                      disabled={loading}
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.password}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Button 
-                    type="submit" 
-                    variant="primary" 
-                    size="lg" 
-                    className="w-100 mb-3"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Spinner animation="border" size="sm" className="me-2" />
-                        Signing In...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-sign-in-alt me-2"></i>
-                        Admin Sign In
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="text-center">
-                    <Button 
-                      variant="link" 
-                      className="text-decoration-none" 
-                      onClick={() => navigate('/login')}
+                <div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
-                      <i className="fas fa-arrow-left me-1"></i> Back to Main Login
-                    </Button>
-                  </div>
-                </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
-  );
+                        {loading ? 'Signing in...' : 'Admin Sign In'}
+                         {!loading && <FaSignInAlt className="ml-2 h-5 w-5" />}
+                    </button>
+                </div>
+            </form>
+            <p className="mt-8 text-center text-sm text-gray-600">
+                Not an admin?{' '}
+                <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+                    User Login
+                </Link>
+            </p>
+        </AuthLayout>
+    );
 };
 
-export default AdminLogin;
+export default AdminLoginPage;

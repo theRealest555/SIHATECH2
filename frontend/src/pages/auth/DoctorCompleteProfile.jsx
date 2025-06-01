@@ -1,268 +1,227 @@
+// src/pages/auth/DoctorCompleteProfile.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { useDispatch, useSelector } from 'react-redux';
-import { 
-  fetchDoctorSpecialities, 
-  selectDoctorSpecialities, 
-  selectDoctorStatus,
-  completeDoctorProfile // Thunk to complete profile
-} from '../../redux/slices/doctorSlice';
-import { selectCurrentUser, selectAuthStatus, selectAuthError, checkAuth } from '../../redux/slices/authSlice'; // For user info
-import { toast } from 'react-toastify';
+import { useAuth } from '../../hooks/useAuth';
+import axios from '../../api/axios'; // For fetching specialities, languages, locations
+import { FaUserMd, FaBriefcaseMedical, FaLanguage, FaMapMarkerAlt, FaGraduationCap, FaPaperPlane } from 'react-icons/fa';
 
-const DoctorCompleteProfile = () => {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+const DoctorCompleteProfilePage = () => {
+    const { user, completeDoctorProfile, loading: authLoading, authError, fetchUser } = useAuth();
+    const navigate = useNavigate();
 
-  // Selectors
-  const currentUser = useSelector(selectCurrentUser);
-  const specialities = useSelector(selectDoctorSpecialities); // Expects array of {id, nom, ...}
-  const doctorOpStatus = useSelector(selectDoctorStatus); // For doctor slice operations like completeProfile
-  const authOpStatus = useSelector(selectAuthStatus); // For auth slice operations
-  const authErr = useSelector(selectAuthError);
+    const [formData, setFormData] = useState({
+        phone_number: '',
+        bio: '',
+        address_line1: '',
+        city: '',
+        country: '', // Consider a country dropdown
+        postal_code: '',
+        speciality_id: '',
+        experience_years: '',
+        consultation_fee: '',
+        languages: [], // Array of language IDs
+        // Add other fields as per your CompleteProfileRequest
+        // e.g., education, certifications
+    });
 
-  // Local state
-  const [formData, setFormData] = useState({
-    speciality_id: '',
-    telephone: currentUser?.telephone || '', // Pre-fill if available
-    adresse: currentUser?.adresse || '',
-    sexe: currentUser?.sexe || '',
-    date_de_naissance: currentUser?.date_de_naissance || '',
-  });
-  const [errors, setErrors] = useState({}); // For validation errors
-
-  // Fetch specialities on mount
-  useEffect(() => {
-    dispatch(fetchDoctorSpecialities());
-  }, [dispatch]);
-
-  // Pre-fill form if currentUser data updates (e.g., after social auth)
-  useEffect(() => {
-    if (currentUser) {
-      setFormData(prev => ({
-        ...prev,
-        telephone: currentUser.telephone || prev.telephone,
-        adresse: currentUser.adresse || prev.adresse,
-        sexe: currentUser.sexe || prev.sexe,
-        date_de_naissance: currentUser.date_de_naissance || prev.date_de_naissance,
-      }));
-    }
-  }, [currentUser]);
+    const [specialities, setSpecialities] = useState([]);
+    const [languagesList, setLanguagesList] = useState([]);
+    const [pageLoading, setPageLoading] = useState(true);
+    const [formError, setFormError] = useState(null);
 
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrors({}); // Clear previous errors
-
-    // Basic client-side validation
-    if (!formData.speciality_id) {
-      setErrors(prev => ({...prev, speciality_id: 'Speciality is required.'}));
-      toast.error('Please select your medical speciality.');
-      return;
-    }
-    // Add more client-side checks if needed, though backend will also validate
-
-    dispatch(completeDoctorProfile(formData))
-      .unwrap()
-      .then((response) => { // Backend returns { message, user (with updated doctor info) }
-        toast.success(response.message || 'Profile completed successfully!');
-        // Optionally update local auth state if backend returns full user object
-        // For now, just refetch auth state to ensure user object is up-to-date
-        dispatch(checkAuth()); 
-        navigate('/dashboard');
-      })
-      .catch((error) => {
-        if (error.errors) {
-          setErrors(error.errors);
-          const firstErrorKey = Object.keys(error.errors)[0];
-          toast.error(error.errors[firstErrorKey][0] || 'Failed to complete profile. Please check the form.');
-        } else {
-          toast.error(error.message || 'An unexpected error occurred.');
+    useEffect(() => {
+        // Redirect if user is not a doctor or profile is already complete
+        if (user && user.role !== 'doctor') {
+            navigate('/dashboard');
         }
-      });
-  };
-  
-  const isLoading = doctorOpStatus === 'loading' || authOpStatus === 'loading';
-  const isLoadingSpecialities = doctorOpStatus === 'loading' && specialities.length === 0;
+        if (user && user.doctor_profile_completed) {
+             navigate('/doctor/dashboard');
+        }
+
+        const fetchData = async () => {
+            setPageLoading(true);
+            try {
+                const [specRes, langRes] = await Promise.all([
+                    axios.get('/api/doctors/specialities'), // Public endpoint
+                    axios.get('/api/doctors/languages')   // Public endpoint
+                ]);
+                setSpecialities(specRes.data.specialities || specRes.data); // Adjust based on actual API response structure
+                setLanguagesList(langRes.data.languages || langRes.data);
+            } catch (error) {
+                console.error("Failed to fetch initial data for profile completion:", error);
+                setFormError("Could not load necessary data. Please try again later.");
+            } finally {
+                setPageLoading(false);
+            }
+        };
+        fetchData();
+    }, [user, navigate]);
+    
+    useEffect(() => {
+        if (authError) {
+            setFormError(authError);
+        }
+    }, [authError]);
 
 
-  // Redirect if not a doctor or profile seems complete (basic check)
-  useEffect(() => {
-    if (currentUser && currentUser.role !== 'medecin') {
-      navigate('/dashboard'); // Or to login if not authenticated
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleLanguageChange = (e) => {
+        const { value, checked } = e.target;
+        setFormData(prev => {
+            const newLanguages = checked
+                ? [...prev.languages, parseInt(value)]
+                : prev.languages.filter(langId => langId !== parseInt(value));
+            return { ...prev, languages: newLanguages };
+        });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setFormError(null);
+        const result = await completeDoctorProfile(formData);
+        if (result.success) {
+            await fetchUser(); // Ensure user context is updated with completion status
+            navigate('/doctor/dashboard');
+        } else {
+             if (result.error && result.error.errors) {
+                // Handle Laravel validation errors
+                const errors = Object.values(result.error.errors).flat().join(' ');
+                setFormError(errors);
+            } else {
+                setFormError(result.error?.message || "An unknown error occurred.");
+            }
+        }
+    };
+    
+    if (pageLoading || !user) {
+        return <div className="flex justify-center items-center min-h-screen"><FaUserMd className="animate-ping h-10 w-10 text-indigo-600" /> Loading profile form...</div>;
     }
-    // More robust check: if doctor profile exists and has speciality_id, redirect
-    if (currentUser?.doctor?.speciality_id) {
-      // navigate('/dashboard'); // Commented out to allow re-completion if needed, or make this check stricter
+    if (user.doctor_profile_completed) {
+         // This should ideally be caught by the useEffect redirect, but as a safeguard
+        return <div className="p-6 text-center">Your profile is already complete. Redirecting...</div>;
     }
-  }, [currentUser, navigate]);
 
 
-  return (
-    <div className="auth-container">
-      <Container>
-        <Row className="justify-content-center">
-          <Col md={8} lg={7}>
-            <Card className="auth-card">
-              <Card.Body className="p-5">
-                <div className="text-center mb-4">
-                  <i className="fas fa-user-md fa-3x text-primary mb-3"></i>
-                  <h2 className="auth-header">Complete Your Profile</h2>
-                  <p className="text-muted">Please provide your professional information to continue.</p>
+    return (
+        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-3xl mx-auto">
+                <div className="bg-white shadow-xl rounded-lg p-8 md:p-12">
+                    <div className="text-center mb-8">
+                        <FaUserMd className="mx-auto h-16 w-16 text-indigo-600 mb-4" />
+                        <h1 className="text-3xl font-extrabold text-gray-900">Complete Your Doctor Profile</h1>
+                        <p className="mt-2 text-sm text-gray-600">
+                            Hello Dr. {user.last_name || user.name}! Please provide additional details to activate your profile.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {formError && <p className="text-red-600 bg-red-100 p-3 rounded-md text-sm">{formError}</p>}
+
+                        {/* Contact & Bio */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700">Phone Number</label>
+                                <input type="tel" name="phone_number" id="phone_number" value={formData.phone_number} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., +1234567890"/>
+                            </div>
+                             <div>
+                                <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">Years of Experience</label>
+                                <input type="number" name="experience_years" id="experience_years" value={formData.experience_years} onChange={handleChange} required min="0" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 5"/>
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="bio" className="block text-sm font-medium text-gray-700">Biography / Professional Statement</label>
+                            <textarea name="bio" id="bio" rows="4" value={formData.bio} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Tell patients about your expertise and approach..."></textarea>
+                        </div>
+
+                        {/* Location */}
+                        <fieldset className="border border-gray-300 p-4 rounded-md">
+                            <legend className="text-lg font-medium text-gray-900 px-2 flex items-center"><FaMapMarkerAlt className="mr-2 text-indigo-600" /> Practice Location</legend>
+                            <div className="space-y-4 mt-2">
+                                <div>
+                                    <label htmlFor="address_line1" className="block text-sm font-medium text-gray-700">Address Line 1</label>
+                                    <input type="text" name="address_line1" id="address_line1" value={formData.address_line1} onChange={handleChange} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2" placeholder="123 Main St"/>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label htmlFor="city" className="block text-sm font-medium text-gray-700">City</label>
+                                        <input type="text" name="city" id="city" value={formData.city} onChange={handleChange} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2" placeholder="Healthcare City"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="postal_code" className="block text-sm font-medium text-gray-700">Postal Code</label>
+                                        <input type="text" name="postal_code" id="postal_code" value={formData.postal_code} onChange={handleChange} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2" placeholder="90210"/>
+                                    </div>
+                                     <div>
+                                        <label htmlFor="country" className="block text-sm font-medium text-gray-700">Country</label>
+                                        <input type="text" name="country" id="country" value={formData.country} onChange={handleChange} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2" placeholder="Your Country"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                        
+                        {/* Speciality and Languages */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div>
+                                <label htmlFor="speciality_id" className="block text-sm font-medium text-gray-700 flex items-center"><FaBriefcaseMedical className="mr-2 text-indigo-600" /> Speciality</label>
+                                <select name="speciality_id" id="speciality_id" value={formData.speciality_id} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 bg-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    <option value="">Select Speciality</option>
+                                    {specialities.map(spec => <option key={spec.id} value={spec.id}>{spec.name}</option>)}
+                                </select>
+                            </div>
+                             <div>
+                                <label htmlFor="consultation_fee" className="block text-sm font-medium text-gray-700">Consultation Fee (e.g., USD)</label>
+                                <input type="number" name="consultation_fee" id="consultation_fee" value={formData.consultation_fee} onChange={handleChange} required min="0" step="0.01" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 75.00"/>
+                            </div>
+                        </div>
+
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center"><FaLanguage className="mr-2 text-indigo-600" /> Languages Spoken</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-40 overflow-y-auto border p-3 rounded-md">
+                                {languagesList.length > 0 ? languagesList.map(lang => (
+                                    <div key={lang.id} className="flex items-center">
+                                        <input 
+                                            id={`lang-${lang.id}`} 
+                                            name="languages" 
+                                            type="checkbox" 
+                                            value={lang.id} 
+                                            checked={formData.languages.includes(lang.id)}
+                                            onChange={handleLanguageChange}
+                                            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                        />
+                                        <label htmlFor={`lang-${lang.id}`} className="ml-2 text-sm text-gray-700">{lang.name}</label>
+                                    </div>
+                                )) : <p className="text-sm text-gray-500 col-span-full">No languages available to select.</p>}
+                            </div>
+                        </div>
+                        
+                        {/* Placeholder for education, etc. Add more fields as needed */}
+                        {/* <div>
+                            <label htmlFor="education" className="block text-sm font-medium text-gray-700 flex items-center"><FaGraduationCap className="mr-2 text-indigo-600" /> Education & Certifications</label>
+                            <textarea name="education" id="education" rows="3" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="List your degrees, certifications, etc."></textarea>
+                        </div>
+                        */}
+
+                        <div className="pt-5">
+                            <button 
+                                type="submit" 
+                                disabled={authLoading}
+                                className="w-full flex justify-center items-center py-3 px-6 border border-transparent rounded-md shadow-lg text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition duration-150"
+                            >
+                                {authLoading ? 'Saving Profile...' : 'Save and Complete Profile'}
+                                {!authLoading && <FaPaperPlane className="ml-2 h-5 w-5" />}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                {authErr && ( // Display general auth error
-                  <Alert variant="danger" className="fade-in">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    {typeof authErr === 'string' ? authErr : 'An error occurred.'}
-                  </Alert>
-                )}
-                {errors.general && ( // Display general form error from backend
-                  <Alert variant="danger" className="fade-in">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    {errors.general}
-                  </Alert>
-                )}
-
-
-                <Form onSubmit={handleSubmit} noValidate>
-                  <div className="bg-light p-4 rounded mb-4">
-                    <h5 className="text-primary mb-3">
-                      <i className="fas fa-stethoscope me-2"></i>
-                      Professional Information
-                    </h5>
-                    
-                    <Form.Group className="mb-3">
-                      <Form.Label>Medical Speciality *</Form.Label>
-                      <Form.Select
-                        name="speciality_id"
-                        value={formData.speciality_id}
-                        onChange={handleChange}
-                        isInvalid={!!errors.speciality_id}
-                        disabled={isLoading || isLoadingSpecialities}
-                      >
-                        <option value="">{isLoadingSpecialities ? "Loading specialities..." : "Select your speciality..."}</option>
-                        {Array.isArray(specialities) && specialities.map((spec) => (
-                          <option key={spec.id} value={spec.id}>
-                            {spec.nom}
-                          </option>
-                        ))}
-                      </Form.Select>
-                      <Form.Control.Feedback type="invalid">{errors.speciality_id}</Form.Control.Feedback>
-                    </Form.Group>
-                  </div>
-
-                  <h5 className="text-primary mb-3">
-                    <i className="fas fa-user-circle me-2"></i>
-                    Personal Information
-                  </h5>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Phone Number</Form.Label>
-                    <Form.Control
-                      type="tel"
-                      name="telephone"
-                      value={formData.telephone}
-                      onChange={handleChange}
-                      placeholder="Enter your phone number"
-                      isInvalid={!!errors.telephone}
-                      disabled={isLoading}
-                    />
-                    <Form.Control.Feedback type="invalid">{errors.telephone}</Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Practice Address</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={2}
-                      name="adresse"
-                      value={formData.adresse}
-                      onChange={handleChange}
-                      placeholder="Enter your practice address"
-                      isInvalid={!!errors.adresse}
-                      disabled={isLoading}
-                    />
-                    <Form.Control.Feedback type="invalid">{errors.adresse}</Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Gender</Form.Label>
-                        <Form.Select
-                          name="sexe"
-                          value={formData.sexe}
-                          onChange={handleChange}
-                          isInvalid={!!errors.sexe}
-                          disabled={isLoading}
-                        >
-                          <option value="">Select...</option>
-                          <option value="homme">Male</option>
-                          <option value="femme">Female</option>
-                        </Form.Select>
-                        <Form.Control.Feedback type="invalid">{errors.sexe}</Form.Control.Feedback>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Date of Birth</Form.Label>
-                        <Form.Control
-                          type="date"
-                          name="date_de_naissance"
-                          value={formData.date_de_naissance}
-                          onChange={handleChange}
-                          isInvalid={!!errors.date_de_naissance}
-                          disabled={isLoading}
-                          max={new Date().toISOString().split('T')[0]} // Prevent future dates
-                        />
-                        <Form.Control.Feedback type="invalid">{errors.date_de_naissance}</Form.Control.Feedback>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Alert variant="info" className="mb-4">
-                    <i className="fas fa-info-circle me-2"></i>
-                    <strong>Next Steps:</strong> After completing your profile, you'll need to upload 
-                    your professional documents for verification before you can start accepting appointments.
-                  </Alert>
-
-                  <Button 
-                    type="submit" 
-                    variant="primary" 
-                    size="lg" 
-                    className="w-100"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Spinner animation="border" size="sm" className="me-2" />
-                        Completing Profile...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-check me-2"></i>
-                        Complete Profile
-                      </>
-                    )}
-                  </Button>
-                </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
-  );
+            </div>
+        </div>
+    );
 };
 
-export default DoctorCompleteProfile;
+export default DoctorCompleteProfilePage;
+
