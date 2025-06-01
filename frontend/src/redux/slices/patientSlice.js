@@ -81,7 +81,7 @@ export const updateAppointmentStatus = createAsyncThunk(
     try {
       // Backend expects 'statut'
       const response = await axios.patch(
-        API_URLS.APPOINTMENTS.UPDATE_STATUS(appointmentId), 
+        API_URLS.PATIENT.UPDATE_APPOINTMENT_STATUS(appointmentId), // Use patient-specific URL 
         { statut: status } // Ensure payload key is 'statut'
       );
       

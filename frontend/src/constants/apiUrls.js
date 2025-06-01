@@ -1,8 +1,3 @@
-/**
- * API URL constants for the application
- * These match the Laravel backend routes defined in routes/api.php
- */
-
 export const API_URLS = {
   // Authentication endpoints
   AUTH: {
@@ -43,13 +38,14 @@ export const API_URLS = {
     UPDATE_PROFILE: '/api/patient/profile',
     UPDATE_PASSWORD: '/api/patient/profile/password',
     UPDATE_PHOTO: '/api/patient/profile/photo',
+    UPDATE_APPOINTMENT_STATUS: (id) => `/api/patient/appointments/${id}/status`, // Added for patient role
   },
   
-  // Appointment endpoints
+  // Appointment endpoints (General - use role-specific ones where possible)
   APPOINTMENTS: {
     LIST: '/api/appointments',
     BOOK: (doctorId) => `/api/patient/doctors/${doctorId}/appointments`, 
-    UPDATE_STATUS: (id) => `/api/appointments/${id}/status`,
+    // UPDATE_STATUS: (id) => `/api/appointments/${id}/status`, // Generic - Replaced by role-specific
   },
   
   // Admin endpoints
