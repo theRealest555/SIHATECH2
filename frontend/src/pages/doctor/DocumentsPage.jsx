@@ -85,15 +85,17 @@ const DoctorDocumentsPage = () => {
     if (loading) return <div className="p-6 text-center flex justify-center items-center min-h-[200px]"><FaSpinner className="animate-spin h-8 w-8 text-indigo-600 mr-3" />Loading documents...</div>;
 
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8 flex items-center"><FaFileMedical className="mr-3 text-indigo-600"/>My Documents</h1>
+        <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
+            <h1 className="text-3xl font-bold text-gray-800 mb-8 flex items-center">
+                <FaFileMedical className="mr-3 text-indigo-600"/>My Documents
+            </h1>
             {error && <p className="text-red-500 bg-red-100 p-3 rounded-md mb-4">{error}</p>}
 
-            <form onSubmit={handleUpload} className="bg-white p-6 rounded-lg shadow-md mb-8 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-700">Upload New Document</h2>
+            <form onSubmit={handleUpload} className="bg-white p-6 rounded-2xl shadow-2xl mb-10 space-y-4 border border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">Upload New Document</h2>
                 <div>
                     <label htmlFor="documentType" className="block text-sm font-medium text-gray-700">Document Type</label>
-                    <select id="documentType" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                    <select id="documentType" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                         <option value="medical_license">Medical License</option>
                         <option value="identity_proof">Identity Proof (e.g., Passport, ID Card)</option>
                         <option value="degree_certificate">Degree Certificate</option>
@@ -104,18 +106,18 @@ const DoctorDocumentsPage = () => {
                     <label htmlFor="file" className="block text-sm font-medium text-gray-700">Select File (PDF, JPG, PNG)</label>
                     <input type="file" id="file" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" required className="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
                 </div>
-                <button type="submit" disabled={uploading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-sm flex items-center justify-center min-w-[120px]">
+                <button type="submit" disabled={uploading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md flex items-center justify-center min-w-[120px] transition-all duration-200">
                     {uploading ? <FaSpinner className="animate-spin h-5 w-5 mr-2"/> : <FaUpload className="h-5 w-5 mr-2"/>}
                     {uploading ? 'Uploading...' : 'Upload'}
                 </button>
             </form>
 
-            <div className="bg-white shadow-xl rounded-lg p-6">
+            <div className="bg-white shadow-2xl rounded-2xl p-6 border border-gray-100">
                 <h3 className="text-xl font-semibold text-gray-700 mb-4">Uploaded Documents List</h3>
                 {documents.length > 0 ? (
                     <ul className="space-y-3">
                         {documents.map(doc => (
-                            <li key={doc.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-gray-50 rounded-md border hover:shadow-md transition-shadow">
+                            <li key={doc.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-indigo-50 rounded-lg border hover:shadow-lg transition-shadow">
                                 <div className="mb-2 sm:mb-0">
                                     <p className="font-medium text-gray-800">{doc.document_type}</p>
                                     <p className="text-sm text-blue-600 hover:text-blue-800 break-all">
@@ -131,7 +133,7 @@ const DoctorDocumentsPage = () => {
                                     }`}>
                                         {doc.status.replace('_', ' ')}
                                     </span>
-                                     <a href={doc.file_path} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 p-1" title="View Document"><FaEye/></a>
+                                    <a href={doc.file_path} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 p-1" title="View Document"><FaEye/></a>
                                     <button onClick={() => handleDelete(doc.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete Document"><FaTrash/></button>
                                 </div>
                             </li>

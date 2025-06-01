@@ -127,16 +127,16 @@ const VerifyEmail = () => {
   }
 
   return (
-    <div className="auth-container">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
       <Container>
         <Row className="justify-content-center">
           <Col md={6} lg={5}>
-            <Card className="auth-card">
+            <Card className="auth-card shadow-2xl rounded-3xl border-0">
               <Card.Body className="p-5 text-center">
                 {status === 'verified' ? (
                   <>
                     <i className="fas fa-check-circle fa-5x text-success mb-4"></i>
-                    <h2 className="mb-3">Email Verified!</h2>
+                    <h2 className="mb-3 font-bold">Email Verified!</h2>
                     <p className="text-muted mb-4">{message}</p>
                     <Spinner animation="border" size="sm" className="me-2" />
                     <span>Redirecting...</span>
@@ -144,7 +144,7 @@ const VerifyEmail = () => {
                 ) : (
                   <>
                     <i className="fas fa-envelope fa-5x text-primary mb-4"></i>
-                    <h2 className="mb-3">Verify Your Email</h2>
+                    <h2 className="mb-3 font-bold">Verify Your Email</h2>
                     
                     {error && (
                       <Alert variant="danger" className="mb-4">
@@ -179,6 +179,7 @@ const VerifyEmail = () => {
                         variant="primary"
                         onClick={resendVerification}
                         disabled={loading || status === 'sent'}
+                        className="py-2 text-lg rounded-lg shadow"
                       >
                         {loading ? (
                           <>
@@ -196,6 +197,7 @@ const VerifyEmail = () => {
                       <Button
                         variant="outline-secondary"
                         onClick={handleLogout}
+                        className="py-2 text-lg rounded-lg shadow"
                       >
                         <i className="fas fa-sign-out-alt me-2"></i>
                         Logout

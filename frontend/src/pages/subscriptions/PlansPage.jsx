@@ -78,7 +78,7 @@ const SubscriptionPlansPage = () => {
     if (error) return <div className="p-4 text-center text-red-600 bg-red-100 rounded-lg shadow">Error: {error}</div>;
 
     return (
-        <div className="py-12 bg-gray-50 min-h-screen">
+        <div className="py-12 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
                     <FaCreditCard className="mx-auto h-16 w-16 text-indigo-600 mb-4"/>
@@ -90,16 +90,21 @@ const SubscriptionPlansPage = () => {
                     <p className="text-center text-gray-500 text-lg">No subscription plans available at the moment. Please check back later.</p>
                 )}
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 items-stretch">
                     {plans.map((plan) => (
-                        <div key={plan.id} className={`bg-white rounded-2xl shadow-xl p-8 flex flex-col ${plan.name.toLowerCase().includes('pro') ? 'border-4 border-indigo-500 relative' : 'border border-gray-200'}`}>
+                        <div
+                            key={plan.id}
+                            className={`relative bg-white rounded-2xl shadow-2xl p-8 flex flex-col border transition-transform duration-200 hover:scale-105 hover:shadow-indigo-200
+                                ${plan.name.toLowerCase().includes('pro') ? 'border-4 border-indigo-500' : 'border border-gray-200'}
+                            `}
+                        >
                             {plan.name.toLowerCase().includes('pro') && (
-                                <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
                                     <span className="px-4 py-1 text-sm font-semibold text-white bg-indigo-500 rounded-full shadow-md">Most Popular</span>
                                 </div>
                             )}
                             <div className="flex-grow">
-                                <h3 className="text-2xl font-semibold text-gray-900">{plan.name}</h3>
+                                <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
                                 <p className="mt-4 flex items-baseline text-gray-900">
                                     <span className="text-4xl font-extrabold tracking-tight">${plan.price}</span>
                                     <span className="ml-1 text-xl font-semibold text-gray-500">/{plan.interval}</span>
@@ -117,9 +122,10 @@ const SubscriptionPlansPage = () => {
                             <button
                                 onClick={() => handleSubscribe(plan.id)}
                                 disabled={subscribingPlanId === plan.id}
-                                className={`mt-8 block w-full py-3 px-6 border border-transparent rounded-lg text-center font-medium transition-colors duration-150
+                                className={`mt-8 block w-full py-3 px-6 border border-transparent rounded-lg text-center font-medium transition-all duration-150
                                     ${plan.name.toLowerCase().includes('pro') ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}
                                     ${subscribingPlanId === plan.id ? 'opacity-70 cursor-wait' : ''}
+                                    focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2
                                 `}
                             >
                                 {subscribingPlanId === plan.id ? (
@@ -132,9 +138,12 @@ const SubscriptionPlansPage = () => {
                         </div>
                     ))}
                 </div>
-                 {!user && (
+                {!user && (
                     <p className="mt-10 text-center text-md text-gray-600">
-                        Already have an account? <Link to="/login" state={{ from: '/subscription-plans' }} className="font-medium text-indigo-600 hover:text-indigo-500">Login</Link> to subscribe.
+                        Already have an account?{' '}
+                        <Link to="/login" state={{ from: '/subscription-plans' }} className="font-medium text-indigo-600 hover:text-indigo-500">
+                            Login
+                        </Link> to subscribe.
                     </p>
                 )}
             </div>

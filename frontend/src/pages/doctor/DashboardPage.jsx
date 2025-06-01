@@ -34,10 +34,11 @@ const DoctorDashboardPage = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8">Doctor Dashboard</h1>
+        <div className="p-4 md:p-10 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-2 drop-shadow text-center">Doctor Dashboard</h1>
+            <p className="text-lg text-gray-600 mb-10 text-center">Manage your appointments, patients, documents, and more.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
                  <DoctorDashboardCard 
                     title="Upcoming Appointments" 
                     value={doctorStats.upcomingAppointments} 
@@ -59,9 +60,9 @@ const DoctorDashboardPage = () => {
                     color="border-yellow-500"
                 />
                  <DoctorDashboardCard 
-                    title="Patient Records" // This would link to a patient management section if it exists
+                    title="Patient Records"
                     icon={<FaUserInjured className="h-8 w-8 text-red-500"/>} 
-                    linkTo="/doctor/patients" // Placeholder - create if needed
+                    linkTo="/doctor/patients"
                     linkText="View Patients"
                     color="border-red-500"
                 />
@@ -79,11 +80,15 @@ const DoctorDashboardPage = () => {
                 />
             </div>
 
-             <div className="bg-white shadow-lg rounded-xl p-6">
+             <div className="bg-white shadow-2xl rounded-2xl p-8">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">Quick Links</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <Link to="/doctor/profile" className="bg-indigo-100 text-indigo-700 text-center py-3 px-4 rounded-lg hover:bg-indigo-200 transition duration-150 font-medium">Edit My Profile</Link>
-                    <Link to="/doctor/availability#leaves" className="bg-red-100 text-red-700 text-center py-3 px-4 rounded-lg hover:bg-red-200 transition duration-150 font-medium">Request Leave</Link>
+                    <Link to="/doctor/profile" className="bg-indigo-100 text-indigo-700 text-center py-3 px-4 rounded-lg hover:bg-indigo-200 transition duration-150 font-medium shadow">
+                        Edit My Profile
+                    </Link>
+                    <Link to="/doctor/availability#leaves" className="bg-red-100 text-red-700 text-center py-3 px-4 rounded-lg hover:bg-red-200 transition duration-150 font-medium shadow">
+                        Request Leave
+                    </Link>
                     {/* Add more quick links as needed */}
                 </div>
             </div>

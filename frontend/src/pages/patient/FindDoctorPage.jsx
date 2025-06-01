@@ -101,13 +101,16 @@ const FindDoctorPage = () => {
     );
 
     return (
-        <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
+        <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
             <header className="mb-10 text-center">
-                <h1 className="text-4xl font-extrabold text-gray-900 mb-3">Find Your Doctor</h1>
+                <h1 className="text-4xl font-extrabold text-gray-900 mb-3 drop-shadow">Find Your Doctor</h1>
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto">Search by name, specialty, location, or availability to find the perfect healthcare professional for your needs.</p>
             </header>
 
-            <form onSubmit={handleSearch} className="bg-white shadow-xl rounded-lg p-6 mb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <form
+                onSubmit={handleSearch}
+                className="bg-white shadow-2xl rounded-2xl p-6 mb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-gray-100"
+            >
                 <div className="lg:col-span-1">
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700">Doctor's Name</label>
                     <input type="text" name="name" id="name" value={filters.name} onChange={handleFilterChange} placeholder="e.g., Dr. Smith" className="mt-1 w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
@@ -119,7 +122,7 @@ const FindDoctorPage = () => {
                         {specialities.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
-                 <div className="lg:col-span-1">
+                <div className="lg:col-span-1">
                     <label htmlFor="location" className="block text-sm font-medium text-gray-700">Location (City)</label>
                     <input type="text" name="location" id="location" value={filters.location} onChange={handleFilterChange} placeholder="e.g., New York" className="mt-1 w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
                 </div>
@@ -128,7 +131,7 @@ const FindDoctorPage = () => {
                     <input type="date" name="availability_date" id="availability_date" value={filters.availability_date} onChange={handleFilterChange} className="mt-1 w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
                 </div>
                 <div className="lg:col-span-1">
-                    <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md flex items-center justify-center h-[46px]">
+                    <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md flex items-center justify-center h-[46px] transition-all duration-200">
                         {loading ? <FaSpinner className="animate-spin h-5 w-5"/> : <FaSearch className="h-5 w-5 mr-2"/>}
                         {loading ? '' : 'Search'}
                     </button>
@@ -136,7 +139,7 @@ const FindDoctorPage = () => {
             </form>
 
             {error && <div className="p-4 text-center text-red-600 bg-red-100 rounded-lg shadow mb-6">Error: {error}</div>}
-            
+
             {loading && (
                 <div className="text-center py-10">
                     <FaSpinner className="animate-spin h-10 w-10 text-indigo-600 mx-auto mb-3"/>
@@ -150,7 +153,7 @@ const FindDoctorPage = () => {
                 </div>
             )}
             {!loading && doctors.length === 0 && !error && (
-                 <div className="text-center py-10 bg-white shadow-lg rounded-lg">
+                <div className="text-center py-10 bg-white shadow-xl rounded-2xl border border-gray-100">
                     <FaUserMd className="h-16 w-16 text-gray-300 mx-auto mb-4"/>
                     <p className="text-gray-600 text-lg">No doctors found matching your criteria. Try broadening your search.</p>
                 </div>

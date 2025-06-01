@@ -230,11 +230,11 @@ const PatientProfile = () => {
   }
 
   return (
-    <Container className="py-4">
+    <Container className="py-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
       <Row>
         <Col lg={12}>
           {/* Profile Header */}
-          <Card className="profile-card mb-4">
+          <Card className="profile-card mb-4 shadow-lg border-0 rounded-4">
             <Card.Body>
               <Row className="align-items-center">
                 <Col md={2} className="text-center">
@@ -242,13 +242,13 @@ const PatientProfile = () => {
                     <img
                       src={profile?.user?.photo ? `http://localhost:8000/storage/${profile.user.photo}` : 'https://via.placeholder.com/150'}
                       alt="Profile"
-                      className="rounded-circle"
+                      className="rounded-circle border border-3 border-primary shadow"
                       style={{ width: '120px', height: '120px', objectFit: 'cover' }}
                     />
                     <Button
                       size="sm"
                       variant="primary"
-                      className="position-absolute bottom-0 end-0 rounded-circle"
+                      className="position-absolute bottom-0 end-0 rounded-circle border border-white shadow"
                       onClick={() => setShowPhotoModal(true)}
                       style={{ width: '35px', height: '35px', padding: 0 }}
                     >
@@ -257,13 +257,13 @@ const PatientProfile = () => {
                   </div>
                 </Col>
                 <Col md={7}>
-                  <h2 className="mb-1">{profile?.user?.prenom} {profile?.user?.nom}</h2>
+                  <h2 className="mb-1 fw-bold">{profile?.user?.prenom} {profile?.user?.nom}</h2>
                   <p className="text-muted mb-2">
                     <i className="fas fa-user me-2"></i>
                     Patient
                   </p>
                   {profile?.user?.email_verified_at && (
-                    <Badge bg="info">
+                    <Badge bg="info" className="me-2">
                       <i className="fas fa-check-circle me-1"></i>
                       Email Verified
                     </Badge>
@@ -281,7 +281,7 @@ const PatientProfile = () => {
                   <Button
                     variant="primary"
                     onClick={() => navigate('/patient')}
-                    className="mb-2 w-100"
+                    className="mb-2 w-100 shadow-sm"
                   >
                     <i className="fas fa-search me-2"></i>
                     Find Doctor
@@ -289,7 +289,7 @@ const PatientProfile = () => {
                   <Button
                     variant="outline-secondary"
                     onClick={handleLogout}
-                    className="w-100"
+                    className="w-100 shadow-sm"
                   >
                     <i className="fas fa-sign-out-alt me-2"></i>
                     Logout
@@ -309,9 +309,9 @@ const PatientProfile = () => {
           )}
 
           {/* Profile Information */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="mb-0">
+          <Card className="mb-4 shadow border-0 rounded-4">
+            <Card.Header className="bg-white border-0">
+              <h5 className="mb-0 fw-bold">
                 <i className="fas fa-user-circle me-2"></i>
                 Personal Information
               </h5>
@@ -495,9 +495,9 @@ const PatientProfile = () => {
           </Card>
 
           {/* Appointments History */}
-          <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">
+          <Card className="shadow border-0 rounded-4">
+            <Card.Header className="d-flex justify-content-between align-items-center bg-white border-0">
+              <h5 className="mb-0 fw-bold">
                 <i className="fas fa-calendar-check me-2"></i>
                 My Appointments
               </h5>
@@ -518,8 +518,8 @@ const PatientProfile = () => {
                 </div>
               ) : appointments.length > 0 ? (
                 <div className="table-responsive">
-                  <Table hover>
-                    <thead>
+                  <Table hover className="align-middle">
+                    <thead className="table-light">
                       <tr>
                         <th>Doctor</th>
                         <th>Speciality</th>

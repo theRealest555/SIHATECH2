@@ -90,12 +90,12 @@ const DoctorAppointmentsPage = () => {
     );
 
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">My Appointments</h1>
+        <div className="p-4 md:p-8 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
+            <h1 className="text-3xl font-bold text-gray-800 mb-6 drop-shadow">My Appointments</h1>
             <div className="mb-6 flex items-center space-x-2 bg-white p-3 rounded-lg shadow">
                 <FaFilter className="text-gray-500"/>
                 <label htmlFor="filter" className="text-sm font-medium text-gray-700">Filter:</label>
-                <select id="filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="p-2 border border-gray-300 rounded-md shadow-sm text-sm">
+                <select id="filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="upcoming">Upcoming</option>
                     <option value="past">Past (Completed)</option>
                     <option value="cancelled">Cancelled</option>
@@ -103,8 +103,17 @@ const DoctorAppointmentsPage = () => {
                 </select>
             </div>
 
-            {loading && <div className="p-6 text-center flex justify-center items-center min-h-[200px]"><FaSpinner className="animate-spin h-8 w-8 text-indigo-600 mr-3" />Loading appointments...</div>}
-            {error && !loading && <div className="p-4 text-center text-red-600 bg-red-100 rounded-lg shadow">Error: {error}</div>}
+            {loading && (
+                <div className="p-6 text-center flex justify-center items-center min-h-[200px]">
+                    <FaSpinner className="animate-spin h-8 w-8 text-indigo-600 mr-3" />
+                    Loading appointments...
+                </div>
+            )}
+            {error && !loading && (
+                <div className="p-4 text-center text-red-600 bg-red-100 rounded-lg shadow mb-6">
+                    Error: {error}
+                </div>
+            )}
 
             {!loading && !error && (
                 appointments.length > 0 ? (
@@ -112,7 +121,10 @@ const DoctorAppointmentsPage = () => {
                         {appointments.map(app => <AppointmentCard key={app.id} appointment={app} />)}
                     </div>
                 ) : (
-                    <p className="text-center text-gray-600 bg-white p-10 rounded-lg shadow">No appointments found for this filter.</p>
+                    <div className="text-center text-gray-600 bg-white p-10 rounded-lg shadow flex flex-col items-center">
+                        <FaCalendarCheck className="text-4xl text-indigo-200 mb-4"/>
+                        No appointments found for this filter.
+                    </div>
                 )
             )}
         </div>

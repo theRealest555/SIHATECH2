@@ -38,9 +38,11 @@ const DashboardPage = () => {
 
     if (loading || !user) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-xl font-semibold">Loading Dashboard...</div>
-                 {/* You can use a spinner component here */}
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-blue-100">
+                <div className="flex items-center justify-center mb-6">
+                    <span className="inline-block w-12 h-12 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
+                </div>
+                <div className="text-2xl font-semibold text-indigo-700">Loading Dashboard...</div>
             </div>
         );
     }

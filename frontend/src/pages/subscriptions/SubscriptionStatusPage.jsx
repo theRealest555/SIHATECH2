@@ -78,70 +78,92 @@ const SubscriptionStatusPage = () => {
     if (error) return <div className="p-4 text-center text-red-600 bg-red-100 rounded-lg shadow">Error: {error}</div>;
 
     return (
-        <div className="py-10 bg-gray-100 min-h-screen">
+        <div className="py-12 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
             <div className="max-w-2xl mx-auto px-4">
-                 <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center flex items-center justify-center">
-                    <FaCreditCard className="mr-3 text-indigo-600"/> My Subscription
+                <h1 className="text-4xl font-extrabold text-gray-800 mb-10 text-center flex items-center justify-center drop-shadow">
+                    <FaCreditCard className="mr-3 text-indigo-600" /> My Subscription
                 </h1>
 
                 {!subscription ? (
-                    <div className="bg-white shadow-xl rounded-lg p-8 text-center">
-                        <FaTimesCircle className="h-16 w-16 text-yellow-500 mx-auto mb-4"/>
-                        <h2 className="text-xl font-semibold text-gray-700 mb-2">No Active Subscription Found</h2>
-                        <p className="text-gray-600 mb-6">You do not currently have an active subscription plan.</p>
-                        <Link 
-                            to="/subscription-plans" 
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md transition duration-150"
+                    <div className="bg-white border border-gray-100 shadow-2xl rounded-2xl p-10 text-center">
+                        <FaTimesCircle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-gray-700 mb-2">No Active Subscription</h2>
+                        <p className="text-gray-500 mb-6">You do not currently have an active subscription plan.</p>
+                        <Link
+                            to="/subscription-plans"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-lg shadow-lg transition duration-150 text-lg"
                         >
                             View Available Plans
                         </Link>
                     </div>
                 ) : (
-                    <div className="bg-white shadow-xl rounded-lg p-8">
-                        <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-200">
+                    <div className="bg-white border border-gray-100 shadow-2xl rounded-2xl p-10">
+                        <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
                             <div>
-                                <h2 className="text-2xl font-semibold text-gray-800">{subscription.plan.name}</h2>
-                                <p className="text-gray-600">${subscription.plan.price} / {subscription.plan.interval}</p>
+                                <h2 className="text-2xl font-bold text-gray-800">{subscription.plan.name}</h2>
+                                <p className="text-gray-500 text-lg">${subscription.plan.price} / {subscription.plan.interval}</p>
                             </div>
-                            <span className={`px-4 py-1.5 text-sm font-semibold rounded-full ${
-                                subscription.status === 'active' && !subscription.cancel_at_period_end ? 'bg-green-100 text-green-800' :
-                                subscription.status === 'active' && subscription.cancel_at_period_end ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                            }`}>
-                                {subscription.status === 'active' && subscription.cancel_at_period_end ? 'Active (Cancels on Period End)' : subscription.status.replace('_', ' ')}
+                            <span className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow
+                                ${
+                                    subscription.status === 'active' && !subscription.cancel_at_period_end
+                                        ? 'bg-green-100 text-green-800'
+                                        : subscription.status === 'active' && subscription.cancel_at_period_end
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                }`
+                            }>
+                                {subscription.status === 'active' && subscription.cancel_at_period_end
+                                    ? 'Active (Cancels on Period End)'
+                                    : subscription.status.replace('_', ' ')}
                             </span>
                         </div>
-                        
-                        <div className="space-y-3 text-sm text-gray-700">
-                            <p><strong>Status:</strong> {subscription.status === 'active' && subscription.cancel_at_period_end ? `Active, will be cancelled on ${new Date(subscription.current_period_end).toLocaleDateString()}` : subscription.status.replace('_', ' ')}</p>
-                            <p><strong>{subscription.cancel_at_period_end || subscription.status !== 'active' ? 'Ends On:' : 'Next Billing Date:'}</strong> {new Date(subscription.current_period_end).toLocaleDateString()}</p>
+
+                        <div className="space-y-3 text-base text-gray-700">
+                            <p>
+                                <strong>Status:</strong>{' '}
+                                {subscription.status === 'active' && subscription.cancel_at_period_end
+                                    ? `Active, will be cancelled on ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                                    : subscription.status.replace('_', ' ')}
+                            </p>
+                            <p>
+                                <strong>
+                                    {subscription.cancel_at_period_end || subscription.status !== 'active'
+                                        ? 'Ends On:'
+                                        : 'Next Billing Date:'}
+                                </strong>{' '}
+                                {new Date(subscription.current_period_end).toLocaleDateString()}
+                            </p>
                             {subscription.payment_method_details && (
-                                <p><strong>Payment Method:</strong> {subscription.payment_method_details.card_brand} ending in **** {subscription.payment_method_details.card_last_four}</p>
+                                <p>
+                                    <strong>Payment Method:</strong> {subscription.payment_method_details.card_brand} ending in **** {subscription.payment_method_details.card_last_four}
+                                </p>
                             )}
                         </div>
 
                         {subscription.status === 'active' && !subscription.cancel_at_period_end && (
-                            <div className="mt-8 pt-6 border-t border-gray-200">
-                                <button 
+                            <div className="mt-10 pt-6 border-t border-gray-200">
+                                <button
                                     onClick={handleCancelSubscription}
                                     disabled={cancelling}
-                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md flex items-center justify-center transition duration-150"
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg shadow-lg flex items-center justify-center transition duration-150 text-lg"
                                 >
-                                    {cancelling ? <FaSpinner className="animate-spin h-5 w-5 mr-2"/> : <FaCalendarTimes className="h-5 w-5 mr-2"/>}
+                                    {cancelling ? <FaSpinner className="animate-spin h-5 w-5 mr-2" /> : <FaCalendarTimes className="h-5 w-5 mr-2" />}
                                     {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
                                 </button>
-                                <p className="text-xs text-gray-500 mt-2 text-center">Cancellation will take effect at the end of the current billing period.</p>
+                                <p className="text-xs text-gray-500 mt-2 text-center">
+                                    Cancellation will take effect at the end of the current billing period.
+                                </p>
                             </div>
                         )}
                         {subscription.status === 'active' && subscription.cancel_at_period_end && (
-                             <p className="mt-6 p-3 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md text-sm text-center">
+                            <p className="mt-8 p-4 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md text-base text-center shadow">
                                 Your subscription is set to cancel on {new Date(subscription.current_period_end).toLocaleDateString()}. You will retain access until this date.
                             </p>
                         )}
-                         {subscription.status !== 'active' && !subscription.cancel_at_period_end && (
-                             <Link 
-                                to="/subscription-plans" 
-                                className="mt-8 block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md transition duration-150"
+                        {subscription.status !== 'active' && !subscription.cancel_at_period_end && (
+                            <Link
+                                to="/subscription-plans"
+                                className="mt-10 block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-lg shadow-lg transition duration-150 text-lg"
                             >
                                 Renew or Choose a New Plan
                             </Link>

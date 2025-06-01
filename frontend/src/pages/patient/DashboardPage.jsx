@@ -23,50 +23,54 @@ const PatientDashboardCard = ({ title, description, icon, linkTo, linkText, colo
 const PatientDashboardPage = () => {
     // Fetch actual data in a real app
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8">Patient Dashboard</h1>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <PatientDashboardCard 
-                    title="Book New Appointment"
-                    description="Find a doctor and schedule your next visit."
-                    icon={<FaCalendarPlus className="h-8 w-8 text-green-500"/>} 
-                    linkTo="/doctors" // Link to doctor search page
-                    linkText="Find & Book"
-                    color="border-green-500"
-                />
-                <PatientDashboardCard 
-                    title="My Appointments"
-                    description="View upcoming and past appointments."
-                    icon={<FaHistory className="h-8 w-8 text-blue-500"/>} 
-                    linkTo="/patient/appointments"
-                    linkText="View History"
-                    color="border-blue-500"
-                />
-                <PatientDashboardCard 
-                    title="My Profile"
-                    description="Update your personal and health information."
-                    icon={<FaUserMd className="h-8 w-8 text-purple-500"/>} 
-                    linkTo="/patient/profile"
-                    linkText="Edit Profile"
-                    color="border-purple-500"
-                />
-                <PatientDashboardCard 
-                    title="Health Records" // Placeholder - if this feature exists
-                    description="Access your medical history and documents."
-                    icon={<FaHeartbeat className="h-8 w-8 text-red-500"/>} 
-                    linkTo="/patient/records" // Create if needed
-                    linkText="View Records"
-                    color="border-red-500"
-                />
-                 <PatientDashboardCard 
-                    title="Subscription Details"
-                    description="Manage your SihaTech subscription plan."
-                    icon={<FaQuestionCircle className="h-8 w-8 text-yellow-500"/>} 
-                    linkTo="/my-subscription"
-                    linkText="My Plan"
-                    color="border-yellow-500"
-                />
+        <div className="p-4 md:p-10 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
+            <div className="max-w-5xl mx-auto">
+                <header className="mb-12 text-center">
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-2 drop-shadow">Welcome to Your Dashboard</h1>
+                    <p className="text-lg text-gray-600">Manage your appointments, profile, and health records all in one place.</p>
+                </header>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <PatientDashboardCard 
+                        title="Book New Appointment"
+                        description="Find a doctor and schedule your next visit."
+                        icon={<FaCalendarPlus className="h-8 w-8 text-green-500"/>} 
+                        linkTo="/doctors"
+                        linkText="Find & Book"
+                        color="border-green-500"
+                    />
+                    <PatientDashboardCard 
+                        title="My Appointments"
+                        description="View upcoming and past appointments."
+                        icon={<FaHistory className="h-8 w-8 text-blue-500"/>} 
+                        linkTo="/patient/appointments"
+                        linkText="View History"
+                        color="border-blue-500"
+                    />
+                    <PatientDashboardCard 
+                        title="My Profile"
+                        description="Update your personal and health information."
+                        icon={<FaUserMd className="h-8 w-8 text-purple-500"/>} 
+                        linkTo="/patient/profile"
+                        linkText="Edit Profile"
+                        color="border-purple-500"
+                    />
+                    <PatientDashboardCard 
+                        title="Health Records"
+                        description="Access your medical history and documents."
+                        icon={<FaHeartbeat className="h-8 w-8 text-red-500"/>} 
+                        linkTo="/patient/records"
+                        linkText="View Records"
+                        color="border-red-500"
+                    />
+                    <PatientDashboardCard 
+                        title="Subscription Details"
+                        description="Manage your SihaTech subscription plan."
+                        icon={<FaQuestionCircle className="h-8 w-8 text-yellow-500"/>} 
+                        linkTo="/my-subscription"
+                        linkText="My Plan"
+                        color="border-yellow-500"
+                    />
+                </div>
             </div>
         </div>
     );

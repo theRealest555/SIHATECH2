@@ -18,32 +18,23 @@ const DoctorStatisticsPage = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-8 flex items-center"><FaChartLine className="mr-3 text-indigo-600"/>My Performance Statistics</h1>
+        <div className="p-4 md:p-10 min-h-screen bg-gradient-to-br from-indigo-50 via-blue-100 to-white">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 mb-10 flex items-center drop-shadow">
+                <FaChartLine className="mr-3 text-indigo-600"/> My Performance Statistics
+            </h1>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
                 <StatCard title="Total Appointments" value={statsData.totalAppointments} icon={<FaCalendarCheck className="text-blue-500"/>} />
                 <StatCard title="Unique Patients Seen" value={statsData.uniquePatients} icon={<FaUsers className="text-green-500"/>} />
                 <StatCard title="Average Rating" value={`${statsData.avgRating} / 5`} icon={<FaChartLine className="text-yellow-500"/>} />
                 <StatCard title="Monthly Earnings (Est.)" value={`$${statsData.monthlyEarnings}`} icon={<FaDollarSign className="text-purple-500"/>} />
             </div>
 
-            <div className="bg-white shadow-xl rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">Appointments Trend (Last 6 Months)</h2>
-                <div className="h-80 text-center flex items-center justify-center bg-gray-50 rounded-md border">
-                    {/* // Example with Recharts:
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={statsData.appointmentsByMonth}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Line type="monotone" dataKey="count" stroke="#8884d8" activeDot={{ r: 8 }} name="Appointments"/>
-                        </LineChart>
-                    </ResponsiveContainer> 
-                    */}
-                     <p className="text-gray-500">Chart placeholder: A line chart showing appointments over time would be displayed here.</p>
+            <div className="bg-white shadow-2xl rounded-2xl p-8">
+                <h2 className="text-xl font-bold text-gray-700 mb-4">Appointments Trend (Last 6 Months)</h2>
+                <div className="h-80 text-center flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+                    {/* Chart placeholder */}
+                    <p className="text-gray-500">Chart placeholder: A line chart showing appointments over time would be displayed here.</p>
                 </div>
             </div>
             {/* Add more sections for other stats like patient demographics, popular services, etc. */}

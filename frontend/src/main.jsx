@@ -3,6 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App.jsx';
+import 'bootstrap/dist/css/bootstrap.min.css'; // Bootstrap CSS
+import 'bootstrap-icons/font/bootstrap-icons.css'; // Bootstrap Icons
 import './index.css'; // Tailwind CSS
 import { AuthProvider } from './contexts/AuthContext.jsx';
 

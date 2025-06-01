@@ -60,38 +60,38 @@ const Navbar = () => {
                         </div>
                     </div>
                     <div className="hidden md:block">
-                        <div className="ml-4 flex items-center md:ml-6">
-                            {user ? (
-                                <>
-                                    <span className="mr-3 text-sm">
-                                        Welcome, {user.first_name || user.name || 'User'} ({user.role})
-                                    </span>
-                                    <Link to={getDashboardPath()} className="p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white" title="Dashboard">
-                                        <FaTachometerAlt className="h-6 w-6" />
-                                    </Link>
-                                    <Link to={getProfilePath()} className="ml-3 p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white" title="Profile">
-                                        <FaUserCircle className="h-6 w-6" />
-                                    </Link>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="ml-3 p-2 rounded-full text-red-300 hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition duration-150"
-                                        title="Logout"
-                                    >
-                                        <FaSignOutAlt className="h-6 w-6" />
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <Link to="/login" className="flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">
-                                        <FaSignInAlt className="mr-1" /> Login
-                                    </Link>
-                                    <Link to="/register" className="flex items-center ml-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-500 hover:bg-blue-400 transition duration-150">
-                                       <FaUserPlus className="mr-1" /> Sign Up
-                                    </Link>
-                                </>
-                            )}
-                        </div>
-                    </div>
+    <div className="ml-4 flex items-center md:ml-6">
+        {user ? (
+            <>
+                <span className="mr-3 text-sm">
+                    Welcome, {user.first_name || user.name || 'User'} ({user.role})
+                </span>
+                <Link to={getDashboardPath()} className="p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition duration-150" title="Dashboard">
+                    <FaTachometerAlt className="h-6 w-6" />
+                </Link>
+                <Link to={getProfilePath()} className="ml-3 p-2 rounded-full hover:bg-indigo-500 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition duration-150" title="Profile">
+                    <FaUserCircle className="h-6 w-6" />
+                </Link>
+                <button
+                    onClick={handleLogout}
+                    className="ml-3 p-2 rounded-full text-red-300 hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition duration-150"
+                    title="Logout"
+                >
+                    <FaSignOutAlt className="h-6 w-6" />
+                </button>
+            </>
+        ) : (
+            <>
+                <Link to="/login" className="flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 hover:bg-opacity-75 transition duration-150">
+                    <FaSignInAlt className="mr-1" /> Login
+                </Link>
+                <Link to="/register" className="flex items-center ml-2 px-3 py-2 rounded-md text-sm font-medium bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow transition duration-150">
+                   <FaUserPlus className="mr-1" /> Sign Up
+                </Link>
+            </>
+        )}
+    </div>
+</div>
                     {/* Mobile menu button (implement if needed) */}
                 </div>
             </div>

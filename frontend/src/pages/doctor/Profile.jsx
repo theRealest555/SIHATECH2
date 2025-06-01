@@ -262,10 +262,11 @@ const DoctorProfile = () => {
   }
 
   return (
-    <Container className="py-4">
+    <Container className="py-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
       <Row>
         <Col lg={12}>
-          <Card className="profile-card mb-4">
+          {/* Profile Header */}
+          <Card className="profile-card mb-4 shadow-lg border-0 rounded-4">
             <Card.Body>
               <Row className="align-items-center">
                 <Col md={2} className="text-center">
@@ -273,14 +274,15 @@ const DoctorProfile = () => {
                     <img
                       src={profile?.user?.photo ? `http://localhost:8000/storage/${profile.user.photo}` : 'https://via.placeholder.com/150'}
                       alt="Profile"
-                      className="rounded-circle"
+                      className="rounded-circle border border-3 border-primary shadow"
                       style={{ width: '120px', height: '120px', objectFit: 'cover' }}
                     />
                     <Button
-                      size="sm" variant="primary"
-                      className="position-absolute bottom-0 end-0 rounded-circle p-0"
+                      size="sm"
+                      variant="primary"
+                      className="position-absolute bottom-0 end-0 rounded-circle border border-white shadow"
                       onClick={() => setShowPhotoModal(true)}
-                      style={{ width: '35px', height: '35px' }}
+                      style={{ width: '35px', height: '35px', padding: 0 }}
                       disabled={isUploadingPhoto}
                     >
                       <i className="fas fa-camera"></i>
@@ -288,7 +290,7 @@ const DoctorProfile = () => {
                   </div>
                 </Col>
                 <Col md={7}>
-                  <h2 className="mb-1">Dr. {profile?.user?.prenom} {profile?.user?.nom}</h2>
+                  <h2 className="mb-1 fw-bold">Dr. {profile?.user?.prenom} {profile?.user?.nom}</h2>
                   <p className="text-muted mb-2">
                     <i className="fas fa-stethoscope me-2"></i>
                     {specialities.find(s => s.id === profile?.doctor?.speciality_id)?.nom || 'Not specified'}
@@ -303,10 +305,10 @@ const DoctorProfile = () => {
                   </div>
                 </Col>
                 <Col md={3} className="text-md-end mt-3 mt-md-0">
-                  <Button variant="primary" onClick={() => navigate('/doctor')} className="mb-2 w-100">
+                  <Button variant="primary" onClick={() => navigate('/doctor')} className="mb-2 w-100 shadow-sm">
                     <i className="fas fa-calendar me-2"></i>My Calendar
                   </Button>
-                  <Button variant="outline-secondary" onClick={handleLogout} className="w-100">
+                  <Button variant="outline-secondary" onClick={handleLogout} className="w-100 shadow-sm">
                     <i className="fas fa-sign-out-alt me-2"></i>Logout
                   </Button>
                 </Col>
@@ -316,9 +318,10 @@ const DoctorProfile = () => {
 
           {userSliceError && <Alert variant="danger" dismissible>{userSliceError}</Alert>}
 
-          <Card>
+          <Card className="shadow border-0 rounded-4">
             <Card.Body>
               <Tabs defaultActiveKey="personal" id="doctor-profile-tabs" className="mb-3 nav-tabs-custom">
+                {/* Personal & Professional Info Tab */}
                 <Tab eventKey="personal" title={<><i className="fas fa-user-edit me-2"></i>Personal & Professional Info</>}>
                   <Form onSubmit={handleSaveProfile}>
                     {/* Personal Info Fields */}
@@ -404,6 +407,7 @@ const DoctorProfile = () => {
                   </Form>
                 </Tab>
 
+                {/* Documents Tab */}
                 <Tab eventKey="documents" title={<><i className="fas fa-file-medical me-2"></i>Verification Documents</>}>
                   <Form onSubmit={handleDocumentUpload} className="mb-4 p-3 border rounded bg-light">
                     <h5 className="mb-3">Upload New Document</h5>
@@ -449,19 +453,20 @@ const DoctorProfile = () => {
                   ) : <Alert variant="info"><i className="fas fa-info-circle me-2"></i>No documents uploaded yet.</Alert>}
                 </Tab>
 
+                {/* Quick Actions Tab */}
                 <Tab eventKey="actions" title={<><i className="fas fa-tasks me-2"></i>Quick Actions</>}>
                   <Row className="g-3">
-                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift">
+                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift rounded-3">
                       <Card.Body><i className="fas fa-clock fa-3x text-primary mb-3"></i><h5>Update Schedule</h5>
                       <p className="text-muted small">Manage your working hours and availability.</p>
                       <Button variant="outline-primary" onClick={() => navigate('/schedule')}>Manage Schedule</Button></Card.Body>
                     </Card></Col>
-                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift">
+                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift rounded-3">
                       <Card.Body><i className="fas fa-calendar-times fa-3x text-warning mb-3"></i><h5>Manage Leaves</h5>
                       <p className="text-muted small">Set your vacation days or periods of absence.</p>
                       <Button variant="outline-warning" onClick={() => navigate('/leaves')}>Manage Leaves</Button></Card.Body>
                     </Card></Col>
-                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift">
+                    <Col md={4}><Card className="h-100 text-center shadow-sm hover-lift rounded-3">
                       <Card.Body><i className="fas fa-list-alt fa-3x text-success mb-3"></i><h5>View Appointments</h5>
                       <p className="text-muted small">Check your upcoming and past appointments.</p>
                       <Button variant="outline-success" onClick={() => navigate(`/doctor/${user?.id}/appointments`)}>View Appointments</Button></Card.Body>

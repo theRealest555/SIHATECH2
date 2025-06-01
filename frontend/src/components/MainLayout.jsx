@@ -8,13 +8,8 @@ const MainLayout = () => {
     return (
         <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-grow bg-gray-100"> 
-                {/* Adding some default padding, but individual pages might override or add more.
-                  Consider removing default padding here if pages handle it entirely.
-                */}
-                <div className="py-2"> {/* Reduced default padding, pages should manage their own */}
-                    <Outlet />
-                </div>
+            <main className="flex-grow bg-gradient-to-br from-indigo-50 via-blue-100 to-white py-4 px-2 md:px-6">
+                <Outlet />
             </main>
             {/* <Footer /> // Uncomment if you have a Footer component */}
             {/* Basic footer example if not using a separate component, can be removed if HomePage has its own or Navbar includes it */}

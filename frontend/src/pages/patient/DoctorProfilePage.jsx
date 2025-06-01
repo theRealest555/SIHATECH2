@@ -177,28 +177,62 @@ const PublicDoctorProfileViewPage = () => {
 
                     {/* Add Review Form */}
                     {user && user.role === 'patient' && (
-                        <form onSubmit={handleReviewSubmit} className="mt-8 pt-6 border-t border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-700 mb-3">Leave a Review</h3>
-                            {reviewError && <p className="text-red-500 text-sm mb-3 bg-red-100 p-2 rounded">{reviewError}</p>}
-                            <div className="mb-3">
-                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700">Rating (1-5 Stars)</label>
-                                <select name="rating" id="rating" value={newReview.rating} onChange={handleReviewChange} className="mt-1 w-full sm:w-1/3 p-2 border border-gray-300 rounded-md shadow-sm">
-                                    {[5,4,3,2,1].map(r => <option key={r} value={r}>{r} Star{r>1?'s':''}</option>)}
+                        <form 
+                            onSubmit={handleReviewSubmit} 
+                            className="mt-10 bg-white border border-indigo-100 rounded-xl shadow-lg p-6 sm:p-8 max-w-2xl mx-auto"
+                        >
+                            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                                <FaCommentMedical className="mr-2 text-indigo-600" /> Leave a Review
+                            </h3>
+                            {reviewError && (
+                                <p className="text-red-600 text-sm mb-3 bg-red-100 p-2 rounded">{reviewError}</p>
+                            )}
+                            <div className="mb-4">
+                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700 mb-1">Rating (1-5 Stars)</label>
+                                <select
+                                    name="rating"
+                                    id="rating"
+                                    value={newReview.rating}
+                                    onChange={handleReviewChange}
+                                    className="w-full sm:w-1/3 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition"
+                                >
+                                    {[5,4,3,2,1].map(r => (
+                                        <option key={r} value={r}>{r} Star{r>1?'s':''}</option>
+                                    ))}
                                 </select>
                             </div>
-                            <div className="mb-4">
-                                <label htmlFor="comment" className="block text-sm font-medium text-gray-700">Comment</label>
-                                <textarea name="comment" id="comment" value={newReview.comment} onChange={handleReviewChange} rows="4" required className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Share your experience..."></textarea>
+                            <div className="mb-6">
+                                <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">Comment</label>
+                                <textarea
+                                    name="comment"
+                                    id="comment"
+                                    value={newReview.comment}
+                                    onChange={handleReviewChange}
+                                    rows="4"
+                                    required
+                                    className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition"
+                                    placeholder="Share your experience..."
+                                ></textarea>
                             </div>
-                            <button type="submit" disabled={reviewSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md flex items-center justify-center min-w-[150px]">
-                                {reviewSubmitting ? <FaSpinner className="animate-spin h-5 w-5 mr-2"/> : <FaPaperPlane className="h-4 w-4 mr-2"/>}
+                            <button
+                                type="submit"
+                                disabled={reviewSubmitting}
+                                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md flex items-center justify-center text-lg transition-all duration-200 disabled:opacity-70 disabled:cursor-wait"
+                            >
+                                {reviewSubmitting ? (
+                                    <FaSpinner className="animate-spin h-5 w-5 mr-2"/>
+                                ) : (
+                                    <FaPaperPlane className="h-4 w-4 mr-2"/>
+                                )}
                                 {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                             </button>
                         </form>
                     )}
-                     {!user && (
-                        <p className="mt-6 text-sm text-gray-600">
-                            <Link to="/login" state={{ from: `/doctors/${doctorId}` }} className="text-indigo-600 hover:underline">Login</Link> to leave a review.
+                    {!user && (
+                        <p className="mt-8 text-sm text-gray-600 text-center">
+                            <Link to="/login" state={{ from: `/doctors/${doctorId}` }} className="text-indigo-600 hover:underline font-semibold">
+                                Login
+                            </Link> to leave a review.
                         </p>
                     )}
                 </div>

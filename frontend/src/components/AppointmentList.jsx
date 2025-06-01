@@ -3,21 +3,33 @@ import { ListGroup, Form } from 'react-bootstrap';
 
 function AppointmentList({ appointments, onStatusUpdate }) {
   return (
-    <div>
-      <h4>Rendez-vous</h4>
+    <div className="bg-white rounded-3 shadow p-4 mb-4">
+      <h4 className="mb-4 fw-bold text-primary">Rendez-vous</h4>
       {!Array.isArray(appointments) || appointments.length === 0 ? (
-        <p>Aucun rendez-vous</p>
+        <p className="text-muted">Aucun rendez-vous</p>
       ) : (
         <ListGroup>
           {appointments.map((appt, index) => (
-            <ListGroup.Item key={appt.id || index}> {/* Fallback to index if id is missing */}
-              {appt.date_heure || 'Date inconnue'} - Statut: {appt.statut || 'Inconnu'}
+            <ListGroup.Item key={appt.id || index} className="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+              <div>
+                <span className="fw-semibold">{appt.date_heure || 'Date inconnue'}</span>
+                <span className="ms-3">
+                  <span className={`badge rounded-pill 
+                    ${appt.statut === 'confirmé' ? 'bg-success' : 
+                      appt.statut === 'annulé' ? 'bg-danger' : 
+                      appt.statut === 'terminé' ? 'bg-secondary' : 
+                      'bg-warning text-dark'}`}>
+                    {appt.statut || 'Inconnu'}
+                  </span>
+                </span>
+              </div>
               <Form.Select
                 size="sm"
-                className="mt-2"
+                className="mt-2 mt-md-0 w-auto"
                 value={appt.statut || 'en_attente'}
                 onChange={(e) => appt.id && onStatusUpdate(appt.id, e.target.value)}
                 disabled={!appt.id}
+                style={{ minWidth: 120 }}
               >
                 <option value="en_attente">En attente</option>
                 <option value="confirmé">Confirmé</option>
